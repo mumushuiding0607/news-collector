@@ -13,6 +13,7 @@ from datetime import datetime, date
 from pathlib import Path
 
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
+from util import COMBINED_DATE_REGEX, parse_publish_time, is_today, extract_date_from_html
 
 
 BASE_DIR = Path(__file__).parent.parent
@@ -23,28 +24,6 @@ LOG_DIR.mkdir(exist_ok=True)
 today = date.today()
 today_str = today.strftime("%Y-%m-%d")
 log_file = LOG_DIR / f"crawl_{datetime.now().strftime('%Y%m%d')}.log"
-
-# 排除非文章 URL（备用）
-INVALID_URL_PATTERNS = [
-    re.compile(r'\.(?:css|js|jpg|jpeg|png|gif|svg|ico|woff|woff2|ttf|eot|map)'),
-    re.compile(r'^(?:javascript:|mailto:|tel:|#)'),
-    re.compile(r'comment'),
-    re.compile(r'#/'),
-    re.compile(r'cnzz|51\.la|umeng|baidu\.com|qcloud'),
-]
-
-# 整合后的日期时间正则（覆盖所有常见格式）
-COMBINED_DATE_REGEX = re.compile(
-    r'(?P<iso>(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})T(\d{1,2}):(\d{2}):(\d{2})(?:\.\d+)?)'          # ISO 8601，允许小数秒
-    r'|(?P<full>(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\s+(\d{1,2}):(\d{2}):(\d{2})(?:\.\d+)?)'      # 带秒，允许小数秒
-    r'|(?P<short>(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\s+(\d{1,2}):(\d{2}))'                       # 带分无秒
-    r'|(?P<dateonly>(\d{4})[-/.](\d{1,2})[-/.](\d{1,2}))'                                        # 纯数字日期
-    r'|(?P<cn_full>(\d{4})年(\d{1,2})月(\d{1,2})日\s*(\d{1,2}):(\d{2}):(\d{2}))'                  # 中文带秒（可无空格）
-    r'|(?P<cn_short>(\d{4})年(\d{1,2})月(\d{1,2})日\s*(\d{1,2}):(\d{2}))'                         # 中文带分（可无空格）
-    r'|(?P<cn_dateonly>(\d{4})年(\d{1,2})月(\d{1,2})日)'                                          # 中文纯日期
-    r'|(?P<en_date>(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4})'       # 英文月日年
-    r'|(?P<us_date>(\d{1,2})/(\d{1,2})/(\d{4}))'                                                  # 美式月/日/年
-)
 
 
 def log(msg: str):
@@ -69,14 +48,17 @@ def init_db():
 
 
 def is_article_url(url: str) -> bool:
-    if any(k in url.lower() for k in ['/node/', '/category/', '/topic/', '/channel/', '/list', '/index', '/page']):
+    # 排除列表页、分类页等非文章 URL
+    if any(k in url.lower() for k in ['/node/', '/category/', '/topic/', '/channel/', '/list/', '/index', '/page']):
         return False
+    # 有 .htm/.html 且 URL 路径中有数字段 → 文章
     digit_segs = re.findall(r'/(\d+)', url)
-    if len(digit_segs) >= 2 and any(ext in url for ext in ['.htm', '.html']):
+    if not digit_segs:
+        digit_segs = re.findall(r'[-.](\d+)[-.]', url)  # 如 detail-message-1207--1.html
+    if len(digit_segs) >= 1 and any(ext in url for ext in ['.htm', '.html']):
         return True
+    # 常见文章路径关键词
     if any(p in url.lower() for p in ['/article/', '/news/', '/info/', '/detail/', '/show/']):
-        return True
-    if len(digit_segs) >= 2 and any(h in url.lower() for h in ['people.com.cn', 'moa.gov.cn', 'csia.net.cn', '100ppi.com', 'smm.cn', 'chinania.org.cn']):
         return True
     return False
 
@@ -94,121 +76,8 @@ def clean_markdown_text(text: str) -> str:
     return text.strip()
 
 
-def parse_publish_time(text: str) -> str | None:
-    """从文本中提取并解析日期时间，使用单正则匹配所有常见格式"""
-    for m in COMBINED_DATE_REGEX.finditer(text):
-        groups = m.groupdict()
-        if groups['iso']:
-            dt_str = re.sub(r'\.\d+$', '', groups['iso'])   # 去除小数秒
-            try:
-                dt = datetime.strptime(dt_str, "%Y-%m-%dT%H:%M:%S")
-                return dt.strftime("%Y-%m-%d %H:%M:%S")
-            except ValueError:
-                continue
-        elif groups['full']:
-            dt_str = re.sub(r'\.\d+$', '', groups['full'])
-            for fmt in ["%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M:%S", "%Y.%m.%d %H:%M:%S"]:
-                try:
-                    dt = datetime.strptime(dt_str, fmt)
-                    return dt.strftime("%Y-%m-%d %H:%M:%S")
-                except ValueError:
-                    continue
-        elif groups['short']:
-            dt_str = groups['short']
-            for fmt in ["%Y-%m-%d %H:%M", "%Y/%m/%d %H:%M", "%Y.%m.%d %H:%M"]:
-                try:
-                    dt = datetime.strptime(dt_str, fmt)
-                    return dt.strftime("%Y-%m-%d %H:%M:00")
-                except ValueError:
-                    continue
-        elif groups['dateonly']:
-            dt_str = groups['dateonly']
-            for fmt in ["%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d"]:
-                try:
-                    dt = datetime.strptime(dt_str, fmt)
-                    return dt.strftime("%Y-%m-%d 00:00:00")
-                except ValueError:
-                    continue
-        elif groups['cn_full']:
-            dt_str = groups['cn_full']
-            try:
-                dt = datetime.strptime(dt_str, "%Y年%m月%d日 %H:%M:%S")
-                return dt.strftime("%Y-%m-%d %H:%M:%S")
-            except ValueError:
-                continue
-        elif groups['cn_short']:
-            dt_str = groups['cn_short']
-            try:
-                dt = datetime.strptime(dt_str, "%Y年%m月%d日 %H:%M")
-                return dt.strftime("%Y-%m-%d %H:%M:00")
-            except ValueError:
-                continue
-        elif groups['cn_dateonly']:
-            dt_str = groups['cn_dateonly']
-            try:
-                dt = datetime.strptime(dt_str, "%Y年%m月%d日")
-                return dt.strftime("%Y-%m-%d 00:00:00")
-            except ValueError:
-                continue
-        elif groups['en_date']:
-            dt_str = groups['en_date']
-            try:
-                dt = datetime.strptime(dt_str, "%b %d, %Y")
-                return dt.strftime("%Y-%m-%d 00:00:00")
-            except ValueError:
-                continue
-        elif groups['us_date']:
-            dt_str = groups['us_date']
-            try:
-                dt = datetime.strptime(dt_str, "%m/%d/%Y")
-                return dt.strftime("%Y-%m-%d 00:00:00")
-            except ValueError:
-                continue
-    return None
-
-
-def is_today(publish_time_str: str | None) -> bool:
-    if not publish_time_str:
-        return False
-    try:
-        pub_date = datetime.strptime(publish_time_str[:10], "%Y-%m-%d").date()
-        return pub_date == today
-    except (ValueError, TypeError):
-        return False
-
-
-def extract_date_from_html(html: str) -> str | None:
-    # 策略1：从 news_bt1_left 提取
-    bt1 = re.search(r'<div\s+class="news_bt1_left"[^>]*>([\s\S]*?)</div>', html)
-    if bt1:
-        pub_time = parse_publish_time(bt1.group(1))
-        if pub_time:
-            return pub_time
-    # 策略2：从 news_info 提取
-    info = re.search(r'<div\s+class="news_info"[^>]*>([\s\S]*?)</div>', html)
-    if info:
-        pub_time = parse_publish_time(info.group(1))
-        if pub_time:
-            return pub_time
-    # 策略3：meta 中的标准时间
-    meta_dates = re.findall(r'(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})', html[:5000])
-    for d in meta_dates:
-        try:
-            dt = datetime.strptime(d, "%Y-%m-%d %H:%M:%S")
-            return dt.strftime("%Y-%m-%d %H:%M:%S")
-        except ValueError:
-            pass
-    # 策略4：datePublished / dateModified
-    date_meta = re.search(r'(?:datePublished|dateModified|pubdate)[^>]*content="([^"]+)"', html, re.IGNORECASE)
-    if date_meta:
-        pub_time = parse_publish_time(date_meta.group(1))
-        if pub_time:
-            return pub_time
-    # 最后兜底：全文本扫描
-    return parse_publish_time(html[:8000])
-
-
-def extract_article_links(markdown: str, source_name: str) -> list[dict]:
+def extract_article_links_with_dates(markdown: str, source_name: str) -> list[dict]:
+    """从列表页 markdown 中提取文章链接，同时尝试从链接所在行提取日期"""
     articles = []
     lines = markdown.split("\n")
     i = 0
@@ -229,6 +98,37 @@ def extract_article_links(markdown: str, source_name: str) -> list[dict]:
         if not is_article_url(url):
             i += 1
             continue
+
+        # 从当前行提取日期（标题内、链接后；或后续行）
+        date_str = None
+        # 1. 尝试从链接标题内提取（[ 标题 2026-05-27 ](url) 这种格式）
+        found = parse_publish_time(title)
+        if found:
+            date_str = found
+            # 从标题中移除日期（只去掉末尾的日期模式，保持标题原名）
+            title = re.sub(r'\s*\d{4}[-/.]\d{1,2}[-/.]\d{1,2}\s*$', '', title).rstrip()
+        # 清理标题：去除首尾空白、方括号等 markdown 残留
+        title = title.strip().strip('[').strip(']').strip()
+        # 2. 链接行内链接之后的部分（[text](url) 后面的内容）
+        if not date_str:
+            after_link = line[m.end():].strip()
+            if after_link:
+                found = parse_publish_time(after_link)
+                if found:
+                    date_str = found
+        # 3. 链接后面的行
+        if not date_str:
+            for look in range(3):
+                if i + look >= len(lines):
+                    break
+                cand = lines[i + look].strip()
+                if re.search(r'\[.+\]\(https?://', cand):
+                    continue
+                found = parse_publish_time(cand)
+                if found:
+                    date_str = found
+                    break
+
         after_link = line[m.end():].strip()
         after_link = clean_markdown_text(after_link)
         subtitle = after_link[:300] if after_link else ""
@@ -250,12 +150,17 @@ def extract_article_links(markdown: str, source_name: str) -> list[dict]:
             "title": title,
             "url": url,
             "subtitle": subtitle,
+            "list_date": date_str,
         })
         i += 1
     return articles
 
 
-async def crawl_article(article: dict, crawler) -> dict | str:
+def extract_article_links(markdown: str, source_name: str) -> list[dict]:
+    return extract_article_links_with_dates(markdown, source_name)
+
+
+async def crawl_article(article: dict, crawler, fallback_date: str | None = None) -> dict | str:
     name = article["source_name"]
     url = article["url"]
     title = article["title"]
@@ -274,6 +179,12 @@ async def crawl_article(article: dict, crawler) -> dict | str:
         html = result.html or ""
         md = result.markdown or ""
         pub_time = extract_date_from_html(html)
+
+        # 文章页无法提取时间，则用列表页 fallback
+        if not pub_time and fallback_date:
+            pub_time = fallback_date
+            log(f"  [FALLBACK] 使用列表页日期 {pub_time} 代替 article.time")
+
         if not pub_time:
             log(f"  [WARN] 无法确认日期: {url}")
             return 'no_date'
@@ -320,8 +231,10 @@ async def main():
     log(f"News crawl start {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     log(f"Target date: {today_str}（仅采集当天新闻）")
 
-    sources = json.loads(SOURCES_PATH.read_text(encoding="utf-8"))["sources"]
-    log(f"Sources loaded: {len(sources)}")
+    sources_data = json.loads(SOURCES_PATH.read_text(encoding="utf-8"))
+    sources = sources_data["sources"]
+    global_limit = sources_data.get("crawNumPerSource")
+    log(f"Sources loaded: {len(sources)}, 全局 crawNumPerSource={global_limit}")
 
     init_db()
     conn = get_db()
@@ -343,7 +256,7 @@ async def main():
         for source in sources:
             name = source["name"]
             list_url = source["url"]
-            craw_limit = source.get("crawNumPerSource")
+            craw_limit = source.get("crawNumPerSource", global_limit)
             log(f"\n-> Phase1 [List] {name}: {list_url}")
 
             run_cfg = CrawlerRunConfig(word_count_threshold=20, verbose=False)
@@ -365,17 +278,18 @@ async def main():
             if not new_articles:
                 continue
 
-            if craw_limit and len(new_articles) > craw_limit:
-                log(f"  [P1] 达到每源上限 {craw_limit}，仅处理前 {craw_limit} 篇")
-                new_articles = new_articles[:craw_limit]
-
             local_today = 0
             local_old = 0
             local_no_date = 0
 
             for art in new_articles:
+                # crawNumPerSource：成功入库达到上限后停止
+                if craw_limit and local_today >= craw_limit:
+                    log(f"  [P1] 已达每源成功入库上限 {craw_limit}，停止该源")
+                    break
+
                 total_urls += 1
-                ret = await crawl_article(art, crawler)
+                ret = await crawl_article(art, crawler, fallback_date=art.get("list_date"))
 
                 if ret == 'not_today':
                     local_old += 1

@@ -1,8 +1,8 @@
 {
   "sources": [
     {
-      "name": "人民网",
-      "url": "http://www.people.com.cn/GB/59476/index.html"
+      "name": "SMM有色快讯",
+      "url": "https://news.smm.cn/live"
     }
   ],
   "crawNumPerSource":2,
@@ -36,10 +36,6 @@
       "url": "https://www.chinania.org.cn/html/hangyexinwen/guoneixinwen/"
     },
     {
-      "name": "上海证券交易所公司公告",
-      "url": "https://www.sse.com.cn/disclosure/listedinfo/announcement/"
-    },
-    {
       "name": "SMM有色快讯",
       "url": "https://news.smm.cn/live"
     },
@@ -47,12 +43,10 @@
       "name": "生意社",
       "url": "https://www.100ppi.com/kx/list-message--1.html"
     },
-    
     {
       "name": "中国电子元件",
       "url": "https://www.ic-ceca.org.cn/hangyezixun.html"
     },
-    
     {
       "name": "农业农村部",
       "url": "https://www.moa.gov.cn/xw/zxfb/"
