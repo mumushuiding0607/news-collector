@@ -1,0 +1,61 @@
+{
+  "sources": [
+    {
+      "name": "人民网",
+      "url": "http://www.people.com.cn/GB/59476/index.html"
+    }
+  ],
+  "crawNumPerSource":2,
+  "sou2": [
+    {
+      "name": "中国能源网",
+      "url": "https://cnenergynews.cn/"
+    },
+    {
+      "name": "快科技",
+      "url": "https://www.mydrivers.com/"
+    },
+    {
+      "name": "人民网",
+      "url": "http://www.people.com.cn/GB/59476/index.html"
+    },
+    {
+      "name": "美联储官网",
+      "url": "https://www.federalreserve.gov/"
+    },
+    {
+      "name": "中国半导体行业协会",
+      "url": "https://web.csia.net.cn/rdxw"
+    },
+    {
+      "name": "中国稀土行业协会",
+      "url": "https://ac-rei.org.cn/"
+    },
+    {
+      "name": "中国有色金属工业网",
+      "url": "https://www.chinania.org.cn/html/hangyexinwen/guoneixinwen/"
+    },
+    {
+      "name": "上海证券交易所公司公告",
+      "url": "https://www.sse.com.cn/disclosure/listedinfo/announcement/"
+    },
+    {
+      "name": "SMM有色快讯",
+      "url": "https://news.smm.cn/live"
+    },
+    {
+      "name": "生意社",
+      "url": "https://www.100ppi.com/kx/list-message--1.html"
+    },
+    
+    {
+      "name": "中国电子元件",
+      "url": "https://www.ic-ceca.org.cn/hangyezixun.html"
+    },
+    
+    {
+      "name": "农业农村部",
+      "url": "https://www.moa.gov.cn/xw/zxfb/"
+    }
+  ]
+}
