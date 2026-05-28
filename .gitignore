@@ -1,5 +1,4 @@
 # 数据库
-*.db
 *.db-shm
 *.db-wal
 
@@ -24,3 +23,5 @@ Thumbs.db
 
 # Crawl4AI
 .cache/
+
+.env

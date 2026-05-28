@@ -1,13 +1,6 @@
 {
   "sources": [
     {
-      "name": "SMM有色快讯",
-      "url": "https://news.smm.cn/live"
-    }
-  ],
-  "crawNumPerSource":2,
-  "sou2": [
-    {
       "name": "中国能源网",
       "url": "https://cnenergynews.cn/"
     },
@@ -51,5 +44,18 @@
       "name": "农业农村部",
       "url": "https://www.moa.gov.cn/xw/zxfb/"
     }
-  ]
+  ],
+  "crawNumPerSource": 2,
+  "maxConsecutiveNonToday": 10,
+  "listPageExtract": {
+    "sourceName": "生意社",
+    "itemSelector": "li",
+    "titleSelector": "div.pr-news-tit a.blue",
+    "contentSelector": "div.pr-news-txt",
+    "dateSelector": "div.pr-news-tit span",
+    "dateExtractMode": "text",
+    "linkSelector": "div.pr-news-tit a.blue",
+    "linkUrlTemplate": "https://www.100ppi.com/kx/{href}",
+    "titleProductOnly": true
+  }
 }
