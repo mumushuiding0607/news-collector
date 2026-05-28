@@ -363,7 +363,7 @@ def extract_content_from_html(html: str, url: str = "") -> dict:
     result = {
         "content": "",
         "ai_summary": "",
-        "source": _detect_source(url),
+        "source": _detect_source(url, html),
         "raw_length": len(html),
     }
 
@@ -415,46 +415,151 @@ def extract_content_from_html(html: str, url: str = "") -> dict:
     return result
 
 
-def _detect_source(url: str) -> str:
-    """检测文章来源"""
-    if "mydrivers.com" in url:
-        return "mydrivers"
-    elif "cnenergynews.cn" in url:
-        return "cnenergynews"
-    elif "smm.cn" in url:
-        return "smm"
-    elif "people.com.cn" in url:
-        return "people"
-    elif "moa.gov.cn" in url:
-        return "moa"
+def _detect_source(url: str = "", html: str = "") -> str:
+    """
+    检测文章来源，优先从 HTML 内容判断，URL 作为兜底
+
+    HTML 特征：
+      - cnenergynews: 有 class="article_content" / class="w-createtime"
+      - mydrivers: 有 class="news_detail" / id="news_detail"
+      - smm: 有 class="live_detail" / news.smm.cn
+      - people: 有 class="people_news_content"
+    """
+    # 1. 从 HTML 内容检测（更可靠）
+    if html:
+        if "cnenergynews.cn" in html or 'class="article_content"' in html or 'class="w-createtime"' in html:
+            return "cnenergynews"
+        if 'id="news_detail"' in html or 'class="news_detail"' in html:
+            return "mydrivers"
+        if 'class="live_detail"' in html or "news.smm.cn" in html:
+            return "smm"
+        if 'class="people_news_content"' in html:
+            return "people"
+        if 'class="article"' in html and 'pubdate' in html:
+            return "cnenergynews"
+
+    # 2. 从 URL 检测（兜底）
+    if url:
+        if "mydrivers.com" in url:
+            return "mydrivers"
+        elif "cnenergynews.cn" in url:
+            return "cnenergynews"
+        elif "smm.cn" in url:
+            return "smm"
+        elif "people.com.cn" in url:
+            return "people"
+        elif "moa.gov.cn" in url:
+            return "moa"
+
     return "unknown"
 
 
 def _extract_content_fallback(html: str) -> str:
-    """从 HTML 中提取正文内容的兜底方法"""
+    """
+    从 HTML 中提取正文内容的兜底方法。
+
+    策略：
+      1. 先找文章核心区域（article_content / rtext / detail_left）
+      2. 只从核心区域内提取 <p> 标签
+      3. 过滤掉来源/时间/编辑/版权等 Boilerplate 行
+    """
     import html as html_module
 
-    # 移除 script、style、nav、footer、aside 等噪音标签
-    html = re.sub(r'<(script|style|nav|footer|aside|header|menu|sidebar)[^>]*>.*?</\1>', '', html, flags=re.DOTALL | re.IGNORECASE)
-    html = re.sub(r'<!--.*?-->', '', html, flags=re.DOTALL)
+    # -------- 1. 找文章核心区域 --------
+    article_area = ""
 
-    # 提取所有 <p> 标签内容
+    # cnenergynews: <section data-type="rtext">
+    m = re.search(r'<section[^>]+data-type=["\']rtext["\'][^>]*>(.*?)</section>', html, re.DOTALL)
+    if m:
+        article_area = m.group(1)
+
+    # cnenergynews: <div class="article_content">
+    if not article_area:
+        m = re.search(r'<div[^>]+class=["\'][^"\']*article_content[^"\']*["\'][^>]*>(.*?)</div>', html, re.DOTALL)
+        if m:
+            article_area = m.group(1)
+
+    # cnenergynews: detail_left
+    if not article_area:
+        m = re.search(r'<div[^>]+class=["\'][^"\']*detail_left[^"\']*["\'][^>]*>(.*?)</div>', html, re.DOTALL)
+        if m:
+            article_area = m.group(1)
+
+    # 通用: article 标签
+    if not article_area:
+        m = re.search(r'<article[^>]*>(.*?)</article>', html, re.DOTALL)
+        if m:
+            article_area = m.group(1)
+
+    # -------- 2. 从核心区域提取段落 --------
+    if article_area:
+        paragraphs = re.findall(r'<p[^>]*>(.*?)</p>', article_area, re.DOTALL | re.IGNORECASE)
+        text_blocks = []
+        for p in paragraphs:
+            text = re.sub(r'<[^>]+>', '', p)
+            text = html_module.unescape(text).strip()
+            if len(text) >= 15:
+                # 过滤 Boilerplate 行
+                if _is_boilerplate_paragraph(text):
+                    continue
+                text_blocks.append(text)
+        if text_blocks:
+            return ' '.join(text_blocks)
+
+    # -------- 3. 全局 <p> 标签（带 Boilerplate 过滤）--------
     paragraphs = re.findall(r'<p[^>]*>(.*?)</p>', html, re.DOTALL | re.IGNORECASE)
     text_blocks = []
     for p in paragraphs:
         text = re.sub(r'<[^>]+>', '', p)
         text = html_module.unescape(text).strip()
-        if len(text) >= 20:
+        if len(text) >= 15 and not _is_boilerplate_paragraph(text):
             text_blocks.append(text)
 
     if text_blocks:
         return ' '.join(text_blocks)
 
-    # 最后兜底：找所有文本节点
+    # -------- 4. 最后兜底：所有文本 --------
     text = re.sub(r'<[^>]+>', ' ', html)
     text = html_module.unescape(text)
     text = re.sub(r'\s{3,}', ' ', text).strip()
     return text
+
+
+def _is_boilerplate_paragraph(text: str) -> bool:
+    """判断段落是否为 Boilerplate（噪音内容）"""
+    # 移除空白后的文本
+    t = text.strip()
+    if not t:
+        return True
+
+    # 关键词过滤
+    bp_keywords = [
+        '文章来源', '来源：', '来源:', '责任编辑', '编辑：', '作者：',
+        '未经授权', '严禁转载', '版权声明', '投稿：', '投稿热线',
+        '微信：', '邮箱：', 'qq.com', '新浪微博', '官方微博',
+        '扫描二维码', '长按识别', '关注我们', '合作伙伴',
+        '相关资讯', '热门文章', '精彩推荐', '相关阅读',
+        '天眼查App显示', '数据显示', '据.*?消息', '年.*?月.*?日',
+        '免责声明', '违法和不良信息', '举报中心',
+    ]
+    for kw in bp_keywords:
+        if kw in t:
+            return True
+
+    # 纯链接类（大量URL或[]()格式）
+    if re.match(r'^\[.+\]\(https?://', t) or t.startswith('http'):
+        return True
+
+    # 太短的日期行
+    if re.match(r'^\d{4}[-/年]\d{1,2}[-/月]\d{1,2}[日]?\s*\d{1,2}:\d{2}', t) and len(t) < 30:
+        return True
+
+    # 合作伙伴列表行
+    if any(org in t for org in ['国家发改委', '国资委', '国家能源局', '中国华能', '中国电建']):
+        if len(t) < 50:
+            return True
+
+    return False
 
 
 if __name__ == "__main__":
