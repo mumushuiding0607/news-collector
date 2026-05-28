@@ -12,7 +12,7 @@ metadata: { "openclaw": { "emoji": "📰" } }
 name: news-collect
 steps:
   - id: crawl
-    command: python 新闻采集/script/crawl_news.py
+    command: python 新闻采集/script/crawl/crawl_news.py
 
   - id: report
     command: >-

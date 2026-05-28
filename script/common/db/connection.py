@@ -9,7 +9,7 @@ db/connection.py - 数据库连接和初始化
 import sqlite3
 from pathlib import Path
 
-_BASE_DIR = Path(__file__).resolve().parent.parent.parent
+_BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 DB_PATH = _BASE_DIR / "db" / "primary.db"
 SCHEMA_PATH = _BASE_DIR / "db" / "schema.sql"
 

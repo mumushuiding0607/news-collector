@@ -173,11 +173,21 @@ def _extract_meta_datetime(html: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# 策略2：HTML 结构化日期块（次优先，正则失败后用）
+# 策略2：HTML 结构化日期块（优先于全文正则，避免抓取到页面其他无关日期）
 # ---------------------------------------------------------------------------
 
 def _extract_html_structured(html: str) -> str | None:
-    """从特定网站的 HTML 结构中提取日期（次优先，在正则失败后用）"""
+    """从特定网站的 HTML 结构中提取日期"""
+    # ===== 优先：提取 article/source/time 结构（最准确）=====
+    # cnenergynews: <span class="time">2026年05月27日 23:22</span>
+    m = re.search(r'<span[^>]+class=["\']time["\'][^>]*>\s*(\d{4}[年]\d{1,2}[月]\d{1,2}[日]\s*\d{1,2}:\d{2})', html)
+    if m:
+        t = parse_publish_time(m.group(1))
+        if t:
+            return t
+
+    # ===== 通用：article/section 内的日期区域 =====
+
     # news_bt1_left
     m = re.search(r'<div\s+class="news_bt1_left"[^>]*>([\s\S]*?)</div>', html)
     if m:
@@ -219,7 +229,7 @@ def _extract_html_structured(html: str) -> str | None:
         if t:
             return t
 
-    # meta datePublished / dateModified / publishdate
+    # ===== meta datePublished / dateModified =====
     m = re.search(
         r'(?:datePublished|dateModified|pubdate|publishdate)[^>]*content="([^"]+)"',
         html, re.IGNORECASE
@@ -242,24 +252,24 @@ def extract_date_from_html(html: str, url: str = "") -> str | None:
     从 HTML 中提取日期时间。
 
     优先级：
-      1. COMBINED_DATE_REGEX 全文本扫描（无截断）
-      2. 结构化 HTML 解析（og:meta / time[datetime] / site-specific）
+      1. HTML 结构化解析（og:meta / article结构内日期 / site-specific）
+      2. COMBINED_DATE_REGEX 全文本扫描（无截断）
       3. URL 路径兜底（最低优先）
     """
     if not html:
         return None
 
-    # 策略1：全文正则扫描（最通用，无截断限制）
-    t = parse_publish_time(html)
+    # 策略1：HTML 结构化解析（最准确，避免抓取到页面其他无关日期）
+    t = _extract_html_structured(html)
     if t:
         return t
 
-    # 策略2：HTML 结构化解析
     t = _extract_meta_datetime(html)
     if t:
         return t
 
-    t = _extract_html_structured(html)
+    # 策略2：全文正则扫描（兜底）
+    t = parse_publish_time(html)
     if t:
         return t
 
@@ -315,6 +325,136 @@ def check_article_quality(title: str, content: str, publish_time: str | None) ->
         report["issues"].append(f"content_impure:label_chars={label_chars}")
 
     return report
+
+
+# ---------------------------------------------------------------------------
+# 内容提取：从原始 HTML 中提取干净的文章正文
+# ---------------------------------------------------------------------------
+
+# 内容区域的 HTML 提取模式（按优先级排序）
+CONTENT_EXTRACT_PATTERNS = [
+    # 1. mydrivers.com: AI摘要（最干净）
+    (r'AI摘要[^>]*内容由AI生成[^>]*"([^"]{20,})"', re.DOTALL),
+    # 2. mydrivers.com: 正文（从"快科技X月X日消息"到"【本文结束】"）
+    (r'(快科技\d{1,2}月\d{1,2}日[^科][^计][^详][^细][^文][^件][^管][^热][^好][^问][^相][^删].*?【本文结束】)', re.DOTALL),
+    # 3. 通用: <article>标签
+    (r'<article[^>]*>(.*?)</article>', re.DOTALL),
+    # 4. 通用: class="article-content" / id="article-content"
+    (r'(?:class|id)=["\'][^"\']*(?:article|content|post|entry)[^"\']*["\'][^>]*>(.*?)(?:</div>|</article>)', re.DOTALL),
+    # 5. 通用: <div class="content">...</div>
+    (r'<div[^>]+class=["\'][^"\']*content[^"\']*["\'][^>]*>([\s\S]{200,})</div>', re.DOTALL),
+]
+
+
+def extract_content_from_html(html: str, url: str = "") -> dict:
+    """
+    从原始 HTML 中提取文章正文内容。
+
+    返回:
+        {
+            "content": str,       # 干净的文章正文
+            "ai_summary": str,    # AI摘要（如有）
+            "source": str,        # 来源网站标识
+            "raw_length": int,    # 原始内容长度
+        }
+    """
+    import html as html_module
+
+    result = {
+        "content": "",
+        "ai_summary": "",
+        "source": _detect_source(url),
+        "raw_length": len(html),
+    }
+
+    if not html or not html.strip():
+        return result
+
+    # -------- 1. 提取 AI 摘要 --------
+    ai_summary_match = re.search(r'AI摘要[^>]*内容由AI生成[^>]*"([^"]{20,})"', html)
+    if not ai_summary_match:
+        ai_summary_match = re.search(r'"AI摘要"[^>]*>([^<]{50,})', html)
+    if ai_summary_match:
+        result["ai_summary"] = ai_summary_match.group(1).strip()
+
+    # -------- 2. 提取正文内容 --------
+    content = ""
+
+    # mydrivers.com 特殊处理：跳过 AI摘要pattern，直接用正文pattern
+    if result["source"] == "mydrivers":
+        patterns_to_try = CONTENT_EXTRACT_PATTERNS[1:]  # skip AI summary
+    else:
+        patterns_to_try = CONTENT_EXTRACT_PATTERNS
+
+    for pattern, flags in patterns_to_try:
+        m = re.search(pattern, html, flags)
+        if m:
+            candidate = m.group(1) if m.lastindex else m.group(0)
+            # 去除 HTML 标签
+            text = re.sub(r'<[^>]+>', '', candidate)
+            text = html_module.unescape(text)
+            text = re.sub(r'\s+', ' ', text).strip()
+            if len(text) >= 200:
+                content = text
+                break
+
+    # -------- 3. 如果没提取到，尝试分段提取 --------
+    if not content:
+        content = _extract_content_fallback(html)
+
+    # -------- 4. 清理残留内容 --------
+    # 去除图片、链接标记等 markdown 噪音
+    if content:
+        content = re.sub(r'!\[([^\]]*)\]\([^)]+\)', '', content)
+        content = re.sub(r'\[\]\([^)]+\)', '', content)
+        content = re.sub(r'#{1,6}\s+', '', content)
+        content = re.sub(r'\s+', ' ', content).strip()
+        content = content.rstrip('【本文结束】').rstrip()
+
+    result["content"] = content
+    return result
+
+
+def _detect_source(url: str) -> str:
+    """检测文章来源"""
+    if "mydrivers.com" in url:
+        return "mydrivers"
+    elif "cnenergynews.cn" in url:
+        return "cnenergynews"
+    elif "smm.cn" in url:
+        return "smm"
+    elif "people.com.cn" in url:
+        return "people"
+    elif "moa.gov.cn" in url:
+        return "moa"
+    return "unknown"
+
+
+def _extract_content_fallback(html: str) -> str:
+    """从 HTML 中提取正文内容的兜底方法"""
+    import html as html_module
+
+    # 移除 script、style、nav、footer、aside 等噪音标签
+    html = re.sub(r'<(script|style|nav|footer|aside|header|menu|sidebar)[^>]*>.*?</\1>', '', html, flags=re.DOTALL | re.IGNORECASE)
+    html = re.sub(r'<!--.*?-->', '', html, flags=re.DOTALL)
+
+    # 提取所有 <p> 标签内容
+    paragraphs = re.findall(r'<p[^>]*>(.*?)</p>', html, re.DOTALL | re.IGNORECASE)
+    text_blocks = []
+    for p in paragraphs:
+        text = re.sub(r'<[^>]+>', '', p)
+        text = html_module.unescape(text).strip()
+        if len(text) >= 20:
+            text_blocks.append(text)
+
+    if text_blocks:
+        return ' '.join(text_blocks)
+
+    # 最后兜底：找所有文本节点
+    text = re.sub(r'<[^>]+>', ' ', html)
+    text = html_module.unescape(text)
+    text = re.sub(r'\s{3,}', ' ', text).strip()
+    return text
 
 
 if __name__ == "__main__":

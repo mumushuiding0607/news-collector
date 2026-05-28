@@ -13,6 +13,8 @@ llm_client.py - LLM 调用封装模块
 import json
 import os
 import re
+import requests
+import aiohttp
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -22,7 +24,7 @@ from dotenv import load_dotenv
 # ---------------------------------------------------------------------------
 
 # .env 文件路径（放在项目根目录，不上传 Git）
-_ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+_ENV_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
 
 
 def load_env():
@@ -138,6 +140,190 @@ def call(prompt: str, timeout: int = 30) -> dict | None:
 
         return parse_response(text_blocks)
 
+    except requests.Timeout:
+        print(f"  [API ERR] 请求超时 timeout={timeout}s")
+        return None
+    except requests.ConnectionError as e:
+        print(f"  [API ERR] 连接错误: {e}")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"  [API ERR] JSON解析失败: {e}, resp.text[:200]={resp.text[:200] if 'resp' in dir() else 'N/A'}")
+        return None
     except Exception as e:
-        print(f"  [API ERR] {e}")
+        print(f"  [API ERR] {type(e).__name__}: {e}")
+        return None
+
+
+async def call_async_raw(prompt: str, timeout: int = 60) -> list[str] | None:
+    """
+    异步调用 Minimax LLM API，返回原始 text blocks（不解析）。
+
+    Args:
+        prompt: 发送给 LLM 的提示词
+        timeout: 请求超时秒数
+
+    Returns:
+        成功: list[str]，各 text block 内容
+        失败: None
+    """
+    headers = {
+        "X-Api-Key": _MINIMAX_API_KEY,
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01"
+    }
+
+    payload = {
+        "model": _MINIMAX_MODEL,
+        "max_tokens": 16000,
+        "messages": [{"role": "user", "content": prompt}]
+    }
+
+    url = f"{_MINIMAX_BASE_URL}/v1/messages"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=payload, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
+                if resp.status != 200:
+                    text = await resp.text()
+                    print(f"  [HTTP {resp.status}] {text[:200]}")
+                    return None
+
+                data = await resp.json()
+                content_blocks = data.get("content", [])
+
+                text_blocks = []
+                for block in content_blocks:
+                    btype = block.get("type", "")
+                    if btype == "text":
+                        text_blocks.append(block.get("text", ""))
+                    elif btype == "thinking":
+                        text_blocks.append(block.get("thinking", "")[:500])
+
+                return text_blocks
+
+    except aiohttp.ServerTimeoutError:
+        print(f"  [API ERR] 异步请求超时 timeout={timeout}s")
+        return None
+    except aiohttp.ClientError as e:
+        print(f"  [API ERR] 异步连接错误: {e}")
+        return None
+    except Exception as e:
+        print(f"  [API ERR] {type(e).__name__}: {e}")
+        return None
+
+
+# ---------------------------------------------------------------------------
+# 异步接口
+# ---------------------------------------------------------------------------
+
+async def call_async(prompt: str, timeout: int = 60) -> dict | None:
+    """
+    异步调用 Minimax LLM API。
+
+    Args:
+        prompt: 发送给 LLM 的提示词
+        timeout: 请求超时秒数
+
+    Returns:
+        解析成功: dict（包含结构化字段）
+        失败: None（API 错误 / 解析失败 / 网络异常）
+    """
+    headers = {
+        "X-Api-Key": _MINIMAX_API_KEY,
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01"
+    }
+
+    payload = {
+        "model": _MINIMAX_MODEL,
+        "max_tokens": 600,
+        "messages": [{"role": "user", "content": prompt}]
+    }
+
+    url = f"{_MINIMAX_BASE_URL}/v1/messages"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=payload, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
+                if resp.status != 200:
+                    text = await resp.text()
+                    print(f"  [HTTP {resp.status}] {text[:200]}")
+                    return None
+
+                data = await resp.json()
+                content_blocks = data.get("content", [])
+
+                text_blocks = []
+                for block in content_blocks:
+                    btype = block.get("type", "")
+                    if btype == "text":
+                        text_blocks.append(block.get("text", ""))
+                    elif btype == "thinking":
+                        text_blocks.append(block.get("thinking", "")[:500])
+
+                return parse_response(text_blocks)
+
+    except aiohttp.ServerTimeoutError:
+        print(f"  [API ERR] 异步请求超时 timeout={timeout}s")
+        return None
+    except aiohttp.ClientError as e:
+        print(f"  [API ERR] 异步连接错误: {e}")
+        return None
+    except Exception as e:
+        print(f"  [API ERR] {type(e).__name__}: {e}")
+        return None
+    """
+    异步调用 Minimax LLM API。
+
+    Args:
+        prompt: 发送给 LLM 的提示词
+        timeout: 请求超时秒数
+
+    Returns:
+        解析成功: dict（包含结构化字段）
+        失败: None（API 错误 / 解析失败 / 网络异常）
+    """
+    headers = {
+        "X-Api-Key": _MINIMAX_API_KEY,
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01"
+    }
+
+    payload = {
+        "model": _MINIMAX_MODEL,
+        "max_tokens": 600,
+        "messages": [{"role": "user", "content": prompt}]
+    }
+
+    url = f"{_MINIMAX_BASE_URL}/v1/messages"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=payload, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
+                if resp.status != 200:
+                    text = await resp.text()
+                    print(f"  [HTTP {resp.status}] {text[:200]}")
+                    return None
+
+                data = await resp.json()
+                content_blocks = data.get("content", [])
+
+                text_blocks = []
+                for block in content_blocks:
+                    btype = block.get("type", "")
+                    if btype == "text":
+                        text_blocks.append(block.get("text", ""))
+                    elif btype == "thinking":
+                        text_blocks.append(block.get("thinking", "")[:500])
+
+                return parse_response(text_blocks)
+
+    except aiohttp.ServerTimeoutError:
+        print(f"  [API ERR] 异步请求超时 timeout={timeout}s")
+        return None
+    except aiohttp.ClientError as e:
+        print(f"  [API ERR] 异步连接错误: {e}")
+        return None
+    except Exception as e:
+        print(f"  [API ERR] {type(e).__name__}: {e}")
         return None

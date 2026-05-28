@@ -45,7 +45,7 @@
       "url": "https://www.moa.gov.cn/xw/zxfb/"
     }
   ],
-  "crawNumPerSource": 2,
+  "crawNumPerSource": 10,
   "maxConsecutiveNonToday": 10,
   "listPageExtract": {
     "sourceName": "生意社",
@@ -57,5 +57,8 @@
     "linkSelector": "div.pr-news-tit a.blue",
     "linkUrlTemplate": "https://www.100ppi.com/kx/{href}",
     "titleProductOnly": true
-  }
+  },
+  "llmBatchSize": 100,
+  "llmTimeout": 300,
+  "llmMaxRetries": 3
 }

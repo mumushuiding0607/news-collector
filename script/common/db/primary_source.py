@@ -41,25 +41,45 @@ def get_unread(limit: int = 10) -> list[tuple]:
 # 写
 # ---------------------------------------------------------------------------
 
-def insert(article: dict, commit: bool = True) -> bool:
+def get_next_batch_id(conn=None) -> int:
+    """获取下一个批次号（当前最大+1）"""
+    must_close = conn is None
+    if conn is None:
+        conn = get_conn()
+    try:
+        cur = conn.execute("SELECT COALESCE(MAX(batch_id), 0) + 1 FROM primary_sources")
+        return cur.fetchone()[0]
+    finally:
+        if must_close:
+            conn.close()
+
+
+def insert(article: dict, commit: bool = True, conn=None) -> bool:
     """
     写入一条一手新闻到 primary_sources。
 
     article 字段：
         source_name, title, url, subtitle, publish_time,
-        content, content_length（可选）
+        content, content_length（可选）, batch_id（可选）
+
+    conn: 可选，传入已有连接以支持事务统一提交。
 
     返回:
         True  = 新增成功
         False = 已存在（INSERT OR IGNORE）
     """
-    conn = get_conn()
+    must_close = conn is None
+    if conn is None:
+        conn = get_conn()
     try:
+        batch_id = article.get("batch_id")
+        if batch_id is None:
+            batch_id = get_next_batch_id(conn)
         conn.execute("""
             INSERT OR IGNORE INTO primary_sources
                 (source_name, title, url, subtitle, publish_time,
-                 content, content_length, status, fetched_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'new', datetime('now','localtime'))
+                 content, content_length, batch_id, status, fetched_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', datetime('now','localtime'))
         """, (
             article.get("source_name", ""),
             article.get("title", ""),
@@ -68,23 +88,27 @@ def insert(article: dict, commit: bool = True) -> bool:
             article.get("publish_time", ""),
             article.get("content", ""),
             article.get("content_length", 0),
+            batch_id,
         ))
         if commit:
             conn.commit()
         return conn.total_changes > 0
     finally:
-        conn.close()
+        if must_close:
+            conn.close()
 
 
-def upsert_list_page_article(article: dict, commit: bool = True) -> bool:
+def upsert_list_page_article(article: dict, commit: bool = True, batch_id: int = None) -> bool:
     """列表页直采模式写入（content 可能是摘要，url 可能为空）"""
     conn = get_conn()
     try:
+        if batch_id is None:
+            batch_id = get_next_batch_id(conn)
         conn.execute("""
             INSERT OR IGNORE INTO primary_sources
                 (source_name, title, url, subtitle, publish_time,
-                 content, content_length, status, fetched_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'new', datetime('now','localtime'))
+                 content, content_length, batch_id, status, fetched_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', datetime('now','localtime'))
         """, (
             article.get("source_name", ""),
             article.get("title", ""),
@@ -93,6 +117,7 @@ def upsert_list_page_article(article: dict, commit: bool = True) -> bool:
             article.get("publish_time", ""),
             article.get("content", ""),
             len(article.get("content", "") or ""),
+            batch_id,
         ))
         if commit:
             conn.commit()
@@ -117,3 +142,95 @@ def mark_read(news_id: int, commit: bool = True):
             conn.commit()
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Step 2 辅助
+# ---------------------------------------------------------------------------
+
+def get_unfiltered_batch(conn=None) -> list[tuple]:
+    """
+    读取最新批次（batch_id=MAX）且 is_useful=0 的新闻，
+    按发布时间倒序。
+    """
+    must_close = conn is None
+    if conn is None:
+        conn = get_conn()
+    try:
+        cur = conn.execute("""
+            SELECT id, source_name, title, url, subtitle, publish_time, content
+            FROM primary_sources
+            WHERE is_useful = 0
+              AND batch_id = (SELECT MAX(batch_id) FROM primary_sources)
+            ORDER BY publish_time DESC
+        """)
+        rows = cur.fetchall()
+        return rows
+    finally:
+        if must_close:
+            conn.close()
+
+
+def mark_useful(news_id: int, useful: int, commit: bool = True, conn=None):
+    """
+    标记新闻是否有用。
+
+    useful: 1=有用, -1=无用, 0=未评估
+    """
+    must_close = conn is None
+    if conn is None:
+        conn = get_conn()
+    try:
+        conn.execute(
+            "UPDATE primary_sources SET is_useful=? WHERE id=?",
+            (useful, news_id)
+        )
+        if commit:
+            conn.commit()
+    finally:
+        if must_close:
+            conn.close()
+
+
+def get_failed_batch(conn=None) -> list[tuple]:
+    """
+    读取最新批次（batch_id=MAX）且 is_useful=-1 的新闻（解析失败待重试），
+    按发布时间倒序。
+    """
+    must_close = conn is None
+    if conn is None:
+        conn = get_conn()
+    try:
+        cur = conn.execute("""
+            SELECT id, source_name, title, url, subtitle, publish_time, content
+            FROM primary_sources
+            WHERE is_useful = -1
+              AND batch_id = (SELECT MAX(batch_id) FROM primary_sources)
+            ORDER BY publish_time DESC
+        """)
+        rows = cur.fetchall()
+        return rows
+    finally:
+        if must_close:
+            conn.close()
+
+
+def get_useful_uncrawled(conn=None) -> list[tuple]:
+    """
+    读取 is_useful=1 且 content_fetched_at IS NULL 的记录（Step 3 用）。
+    """
+    must_close = conn is None
+    if conn is None:
+        conn = get_conn()
+    try:
+        cur = conn.execute("""
+            SELECT id, source_name, title, url, subtitle, publish_time
+            FROM primary_sources
+            WHERE is_useful = 1
+              AND content_fetched_at IS NULL
+            ORDER BY publish_time DESC
+        """)
+        return cur.fetchall()
+    finally:
+        if must_close:
+            conn.close()

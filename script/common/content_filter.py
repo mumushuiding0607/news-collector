@@ -26,7 +26,7 @@ MARKDOWN_GENERATOR: DefaultMarkdownGenerator = None
 
 
 def create_content_filter(
-    min_word_threshold: int = 10,
+    min_word_threshold: int = 5,
     threshold: float = 0.48,
     threshold_type: str = "fixed",
 ) -> PruningContentFilter:
@@ -107,6 +107,18 @@ BOILERPLATE_PATTERNS = [
     (r"^本文结束.*$", re.MULTILINE),
     # 推荐阅读/相关阅读残留
     (r"^【相关.*?】.*$", re.MULTILINE),
+    # ==== 站点导航/面包屑残留 ====
+    # cnenergynews.cn 等能源类网站顶部导航残留
+    (r"^广告\s*人民日报主管.*?主办\s*网站地图.*?$", re.MULTILINE),
+    (r"^网站地图\s*联系我们\s*首页.*?$", re.MULTILINE),
+    # 数字编号导航残留 (1. 首页 2. 会议会展 3. 正文)
+    (r"^\d+\.\s*(?:首页|会议会展|正文|新闻|资讯|文章)[^\n]*$", re.MULTILINE),
+    # 分类导航残留 (即时新闻 能源要闻 焦点关注...)
+    (r"^(?:即时新闻|能源要闻|焦点关注|能源评论|能源党建|热点专题|生态环保|人事动态|能源城市|环球视野|产业聚焦|电网电力|新能源|油气)\s*", re.MULTILINE),
+    # 顶部站名/主办方残留
+    (r"^人民日报主管.*?有限公司主办\s*$", re.MULTILINE),
+    # 来源行残留 (来源：中国能源网2026年05月26日 17:42)
+    (r"^来源[：:]\s*[^\n]+\d{4}[年-]\d{2}[月-]\d{2}[日]?\s*\d{2}:\d{2}.*$", re.MULTILINE | re.IGNORECASE),
 ]
 
 
@@ -140,6 +152,39 @@ def _clean_markdown_light(text: str) -> str:
 # ---------------------------------------------------------------------------
 # 主入口函数：直接对原始 HTML 返回干净正文文本
 # ---------------------------------------------------------------------------
+
+# HTML 直接提取的备用模式（当 PruningContentFilter 无法提取时使用）
+HTML_EXTRACT_PATTERNS = [
+    # cnenergynews.cn 等能源类网站：<section data-type="rtext">...</section>
+    (r'<section[^>]*data-type=["\']rtext["\'][^>]*>(.*?)</section>', re.DOTALL),
+    # 通用：article 标签内内容
+    (r'<article[^>]*>(.*?)</article>', re.DOTALL),
+    # 通用：class="article-content" 或 id="article-content"
+    (r'(?:class|id)=["\'][^"\']*(?:article|content|post|entry)[^"\']*["\'][^>]*>(.*?)</(?:div|p|article)>', re.DOTALL),
+    # 通用：<div class="content">...</div>
+    (r'<div[^>]+class=["\'][^"\']*content[^"\']*["\'][^>]*>([\s\S]{200,})</div>', re.DOTALL),
+]
+
+
+def _extract_by_html_pattern(html: str) -> str:
+    """
+    当 PruningContentFilter 失效时，直接用正则从 HTML 提取正文。
+    """
+    import html as html_module
+
+    for pattern, flags in HTML_EXTRACT_PATTERNS:
+        m = re.search(pattern, html, flags)
+        if m:
+            block = m.group(1)
+            # 去除标签，保留文字
+            text = re.sub(r'<[^>]+>', '', block)
+            text = html_module.unescape(text)
+            text = re.sub(r'\s+', ' ', text).strip()
+            if len(text) >= 100:
+                return text
+    return ""
+
+
 def extract_clean_content(html: str, base_url: str = "") -> str:
     """
     完整流程：对任意数据源的 HTML → 返回干净正文文本。
@@ -147,7 +192,9 @@ def extract_clean_content(html: str, base_url: str = "") -> str:
     流程：
       1. PruningContentFilter 过滤 HTML DOM 结构
       2. DefaultMarkdownGenerator 生成 fit_markdown
-      3. clean_boilerplate_text 二次清理残留 boilerplate
+      3. fit_markdown 不足50字 → raw_markdown 轻度清理
+      4. 仍不足 → 直接正则从 HTML 提取正文
+      5. clean_boilerplate_text 二次清理残留 boilerplate
 
     参数：
       html: 原始 HTML 字符串
@@ -170,14 +217,39 @@ def extract_clean_content(html: str, base_url: str = "") -> str:
 
     fit_md = result.fit_markdown or ""
     if not fit_md or len(fit_md.strip()) < 50:
-        # Fallback: fit_markdown 为空或极短 → 尝试 raw_markdown（轻度清理）
+        # Fallback 1: raw_markdown 轻度清理
         raw_md = result.raw_markdown or ""
         if raw_md and len(raw_md) > 100:
             text = _clean_markdown_light(raw_md)
             text = clean_boilerplate_text(text)
             if len(text) >= 50:
                 return text.strip()
+        # Fallback 2: 直接从 HTML 提取正文
+        text = _extract_by_html_pattern(html)
+        if text:
+            text = clean_boilerplate_text(text)
+            return text.strip()
         # 确实无法提取，返回空
+        return ""
+
+    # 检查 fit_md 是否为 boilerplate 残渣（footer/版权/投稿信息）
+    boilerplate_indicators = [
+        '投稿', '责任编辑', '版权', '版权所有', '中国能源网',
+        '联系电话', '邮箱:', '微信/', 'qq.com',
+    ]
+    boilerplate_ratio = sum(1 for kw in boilerplate_indicators if kw in fit_md) / len(boilerplate_indicators)
+    if boilerplate_ratio >= 0.3 or len(fit_md.strip()) < 100:
+        # 视为无效提取，尝试 HTML 正则提取
+        raw_md = result.raw_markdown or ""
+        if raw_md and len(raw_md) > 100:
+            text = _clean_markdown_light(raw_md)
+            text = clean_boilerplate_text(text)
+            if len(text) >= 100:
+                return text.strip()
+        text = _extract_by_html_pattern(html)
+        if text:
+            text = clean_boilerplate_text(text)
+            return text.strip()
         return ""
 
     # 转换为纯文本

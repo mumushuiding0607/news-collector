@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS primary_sources (
   publish_time TEXT,
   content TEXT,
   content_length INTEGER DEFAULT 0,
+  batch_id INTEGER NOT NULL DEFAULT 0,
+  is_useful INTEGER DEFAULT 0,  -- 0=未评估, 1=有用, -1=无用
   status TEXT DEFAULT 'new',
   fetched_at TEXT DEFAULT (datetime('now','localtime')),
   content_fetched_at TEXT

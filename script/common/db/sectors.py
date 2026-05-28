@@ -21,7 +21,7 @@ from pathlib import Path
 # ==================== 路径配置 ====================
 
 _MODULE_DIR = Path(__file__).parent
-_BASE_DIR = _MODULE_DIR.parent.parent
+_BASE_DIR = _MODULE_DIR.parent.parent.parent
 PRIMARY_DB = _BASE_DIR / "db" / "primary.db"
 
 
@@ -146,6 +146,7 @@ def insert_or_update(code: str, name: str, keywords: str = "", commit: bool = Tr
 
 def batch_insert(items: list[dict], commit: bool = True):
     """批量插入板块记录"""
+    conn = None
     try:
         conn = _get_conn()
         for item in items:
@@ -164,7 +165,8 @@ def batch_insert(items: list[dict], commit: bool = True):
         if commit:
             conn.commit()
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
 # ==================== 板块检索 ====================
@@ -288,7 +290,7 @@ def sync_from_iwencai(loop: int = 5) -> dict:
     Returns:
         {"status": "success", "added": 480, "total": 480}
     """
-    from iwencai import query_wencai
+    from common.iwencai import query_wencai
 
     result = query_wencai("二级概念板块或二级行业板块", secondary_intent="zhishu", page=1, perpage=100, loop=loop)
     if result["status"] != "success":
