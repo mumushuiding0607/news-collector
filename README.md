@@ -7,71 +7,122 @@
 ```
 新闻采集/
 ├── db/
-│   ├── schema.sql      # 数据库表结构
-│   ├── primary.db      # SQLite 数据库（自动生成）
-│   └── __init__.py     # 数据库模块
+│   └── primary.db      # SQLite 数据库（自动生成）
+├── init_db.py          # 数据库初始化入口
+├── script/
+│   ├── common/         # 公共模块
+│   │   ├── __init__.py # 初始化工具（init_all, sync_sectors 等）
+│   │   └── db/
+│   │       ├── schema.sql   # 数据库表结构（唯一定义源）
+│   │       ├── connection.py # 数据库连接
+│   │       ├── primary_source.py # 一手新闻表
+│   │       ├── importance.py   # 评分表
+│   │       ├── sectors.py     # 板块归一化
+│   │       └── ...
+│   ├── crawl/          # 采集脚本
+│   │   ├── crawler.py  # 采集入口
+│   │   ├── article_crawler.py
+│   │   └── ...
+│   └── ...
 ├── config/
 │   └── sources.json    # 数据源配置
 ├── logs/               # 运行日志
-├── prompt/
-│   └── 事件评估.md      # 评分提示词模板
-├── script/
-│   ├── crawl_news.py    # 新闻采集（Step1）
-│   ├── read_news.py     # 新闻评分（Step2）
-│   ├── sector_index.py  # 板块指数查询（Step3）
-│   ├── report.py        # 报告生成（Step4）
-│   ├── content_filter.py # 内容过滤
-│   ├── util.py          # 工具函数
-│   ├── llm_client.py    # LLM调用封装
-│   ├── iwencai.py       # 同花顺数据查询
-│   ├── hexin-v.bundle.cjs # Token生成器
-│   ├── wencai_headers.json # 缓存
-│   └── db/
-│       ├── __init__.py
-│       ├── connection.py  # 数据库连接
-│       ├── primary_source.py # 一手新闻表
-│       ├── importance.py   # 评分表
-│       └── sectors.py     # 板块归一化
-└── README.md
+└── prompt/
+    └── 事件评估.md      # 评分提示词模板
 ```
+
+## 快速开始
+
+### 1. 初始化数据库（首次部署）
+```bash
+python init_db.py
+```
+
+这将：
+- 执行 schema.sql 创建所有表（primary_sources, importance, sectors, sector_indices 等）
+- 验证 FTS5 虚拟表是否正常
+- 从同花顺同步 480 条板块数据
+
+### 2. 运行采集
+```bash
+python -m script.crawl.crawler
+```
+
+## 数据库初始化
+
+### init_db.py - 初始化入口
+
+```bash
+# 一键初始化（创建表 + 同步sectors）
+python init_db.py
+
+# 仅检查状态
+python init_db.py --check-only
+
+# 强制重新同步sectors
+python init_db.py --force-sync
+
+# 强制修复FTS5
+python init_db.py --force-repair
+```
+
+### common/__init__.py - 初始化工具
+
+```python
+from common import init_all, check_tables, sync_sectors
+
+# 一键初始化
+init_all()
+
+# 检查表结构
+check_tables()
+
+# 检查sectors数据
+count = sectors_count()
+
+# 强制同步sectors
+sync_sectors(loop=5)
+```
+
+### schema.sql - 表结构唯一定义源
+
+**重要**：所有表结构定义在 `script/common/db/schema.sql` 中，是唯一的表结构定义源。
+
+修改表结构只需编辑 `schema.sql`，然后运行 `init_db.py` 即可同步。
+
+包含：
+- primary_sources（一手新闻表）
+- importance（评分表）
+- sectors（板块表）
+- sector_indices（板块指数表）
+- sectors_fts（FTS5全文索引）
+- 触发器（sectors_ai, sectors_ad, sectors_au）
 
 ## 工作流程
 
-### Step 1: 采集 (crawl_news.py)
+### Step 1: 采集 (crawler.py)
 ```bash
-python script/crawl_news.py
+python -m script.crawl.crawler
 ```
-- 从列表页提取文章URL+标题（不写库）
-- 逐篇抓取正文 → 提取真实发布时间 → 日期过滤 → 完整正文入库
+- 从列表页提取文章URL+标题
+- 逐篇抓取正文 → 日期过滤 → 入库
 - 只采集当天的新闻
 
-### Step 2: 评分 (read_news.py)
-```bash
-python script/read_news.py [--limit N] [--dry-run]
-```
-- 读取 status='new' 的新闻
+### Step 2: LLM过滤 (news_filter.py)
+- 读取 is_useful=0 的新闻
 - 调用LLM判断是否会引起交易市场波动
-- 若能：生成摘要、关联板块（归一化）、评分，存入 importance 表
-- 标记新闻为已读
-- 同一时间段评分的新闻算同一批次
+- 标记 is_useful=1 则后续采集正文
 
-### Step 3: 关联板块指数 (sector_index.py)
-```bash
-python script/sector_index.py query <板块名>
-python script/sector_index.py batch <板块1,板块2>
-```
-- 批量查询板块当前指数和涨跌幅
-- 归一化LLM输出的板块名（零token）
-- 支持查询特定新闻发布瞬间的板块指数
+### Step 3: 采集正文 (article_crawler.py)
+- 读取 is_useful=1 且 status='new' 的记录
+- 抓取文章正文 → 提取发布时间 → 入库
 
-### Step 4: 输出报告 (report.py)
+### Step 4: 评分 (read_news.py)
 ```bash
-python script/report.py [--top N] [--json] [--save FILE]
+python script/read_news.py
 ```
-- 查询最新批次的高评分新闻
-- 批量查询关联板块涨跌幅
-- 计算新闻发布至今的涨跌幅
-- 生成格式化报告
+- 调用LLM生成摘要、关联板块、评分
+- 存入 importance 表
 
 ## 数据库表
 
@@ -101,7 +152,7 @@ python script/report.py [--top N] [--json] [--save FILE]
 LLM输出的板块名通过本地sectors表归一化，不消耗额外token：
 
 ```python
-from db.sectors import normalize
+from common import normalize
 
 # LLM返回"稀土|芯片|AI"
 results = normalize("稀土|芯片|AI")

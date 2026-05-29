@@ -3,6 +3,7 @@
 # 日志
 logs/
 test/
+db/
 
 # Python
 __pycache__/

@@ -83,7 +83,7 @@
     },
     {
       "name": "SMM有色快讯",
-      "is_flash": true,
+      "is_flash": false,
       "url": "https://news.smm.cn/live",
       "contentExtract": "<article[^>]*>([\\s\\S]*?)<\\/article>|<div[^>]*(?:class|id)=[\"'][^\"']*(?:article|content|detail|news|post|entry|body)[\"'][^>]*>([\\s\\S]*?)<\\/div>(?=\\s*<div[^>]*(?:class|id)=[\"'][^\"']*(?:related|comment|sidebar|footer|nav))",
       "publishTimeExtract": {
@@ -144,18 +144,7 @@
   ],
   "crawNumPerSource": 20,
   "maxConsecutiveNonToday": 10,
-  "llmBatchSize": 100,
+  "llmBatchSize": 50,
   "llmTimeout": 300,
-  "llmMaxRetries": 3,
-  "listPageExtract": {
-    "sourceName": "生意社",
-    "itemSelector": "li",
-    "titleSelector": "div.pr-news-tit a.blue",
-    "contentSelector": "div.pr-news-txt",
-    "dateSelector": "div.pr-news-tit span",
-    "dateExtractMode": "text",
-    "linkSelector": "div.pr-news-tit a.blue",
-    "linkUrlTemplate": "https://www.100ppi.com/kx/{href}",
-    "titleProductOnly": true
-  }
+  "llmMaxRetries": 3
 }

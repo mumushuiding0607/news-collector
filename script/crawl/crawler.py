@@ -29,10 +29,10 @@ def main():
     print("=" * 60)
 
     print("\n>>> Step 1: 采集列表页")
-    list_crawler_main()
+    asyncio.run(list_crawler_main())
 
     print("\n>>> Step 2: LLM 过滤")
-    news_filter_main()
+    asyncio.run(news_filter_main())
 
     print("\n>>> Step 3: 增量采集文章正文")
     asyncio.run(article_crawler_main())

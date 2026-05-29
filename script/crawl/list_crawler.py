@@ -156,31 +156,12 @@ def extract_list_page_articles(
     content_sel = cfg.get("contentSelector", "div.pr-news-txt")
     date_sel = cfg.get("dateSelector", "div.pr-news-tit span")
     date_mode = cfg.get("dateExtractMode", "text")
-    link_sel = cfg.get("linkSelector", "div.pr-news-tit a.blue")
-    link_template = cfg.get("linkUrlTemplate", "")
     title_date_pat = cfg.get("titleDateRemovePattern", "")
     title_product_only = cfg.get("titleProductOnly", False)
 
     articles = []
     for item in soup.select(item_sel):
-        title_el = item.select_one(title_sel)
-        if not title_el:
-            fallback_sel = cfg.get("titleSelectorFallback", "")
-            if fallback_sel:
-                title_el = item.select_one(fallback_sel)
-        if not title_el:
-            continue
-        title_text = title_el.get_text(separator='', strip=True)
-        if title_product_only:
-            m = re.match(r'^\s*\[([^\]]+)\]', title_text)
-            if m:
-                title_text = m.group(1).strip()
-        if len(title_text) <= 2:
-            continue
-        if title_date_pat:
-            title_text = re.sub(title_date_pat, '', title_text).strip()
-        title_text = re.sub(r'\s+', ' ', title_text).strip()
-
+        # 1. 提取日期（从 dateSelector）
         date_str = None
         if date_sel:
             date_el = item.select_one(date_sel)
@@ -191,6 +172,33 @@ def extract_list_page_articles(
                     date_str = date_el.get_text(strip=True)
                     date_str = parse_publish_time(date_str)
 
+        # 2. 提取标题
+        title_el = item.select_one(title_sel)
+        if not title_el:
+            fallback_sel = cfg.get("titleSelectorFallback", "")
+            if fallback_sel:
+                title_el = item.select_one(fallback_sel)
+        if not title_el:
+            continue
+
+        # 移除日期元素，只保留标题文本
+        for date_el in title_el.select(date_sel):
+            date_el.decompose()
+
+        title_text = title_el.get_text(separator='', strip=True)
+
+        if title_product_only:
+            m = re.match(r'^\s*\[([^\]]+)\]', title_text)
+            if m:
+                title_text = m.group(1).strip()
+        if title_date_pat:
+            title_text = re.sub(title_date_pat, '', title_text).strip()
+        title_text = re.sub(r'\s+', ' ', title_text).strip()
+
+        if len(title_text) <= 2:
+            continue
+
+        # 3. 提取内容
         content = ""
         if content_sel:
             content_el = item.select_one(content_sel)
@@ -198,24 +206,12 @@ def extract_list_page_articles(
                 content = content_el.get_text(separator=' ', strip=True)
                 content = clean_boilerplate_text(content)
 
-        url = ""
-        if link_sel and link_template:
-            link_el = item.select_one(link_sel)
-            if link_el and link_el.get('href'):
-                href = link_el.get('href')
-                url = link_template.replace("{href}", href)
-        elif link_template:
-            link_el = item.find('a', href=True)
-            if link_el:
-                href = link_el.get('href')
-                url = link_template.replace("{href}", href)
-
         subtitle = content[:300] if content else ""
 
         articles.append({
             "source_name": source_name,
             "title": title_text,
-            "url": url,
+            "url": "",  # 列表页直采无链接
             "subtitle": subtitle,
             "publish_time": date_str or "",
             "content": content,

@@ -1,13 +1,18 @@
 """
 db/sectors.py - 板块数据库管理
 
-在 primary.db 中存储板块数据，提供检索和归一化匹配。
+重要：
+  表结构定义在 db/schema.sql 中，不要在此文件中硬编码建表语句。
 
-核心功能：
+功能：
   - 从同花顺获取全部板块数据（二级概念/行业板块，共480条）
   - 预计算拼音首字母、简称等同义词
   - 支持精确匹配、拼音匹配、FTS5全文搜索
   - 零token的板块归一化
+
+初始化：
+  表由 schema.sql 统一创建，包括 sectors 表、FTS5虚拟表和触发器。
+  如需单独初始化，可调用 init_db()。
 
 依赖：
   - iwencai 模块（用于获取板块数据）
@@ -54,57 +59,11 @@ except ImportError:
 # ==================== 数据库连接 ====================
 
 def _get_conn() -> sqlite3.Connection:
-    """获取 primary.db 连接（自动建表）"""
-    conn = sqlite3.connect(PRIMARY_DB)
+    """获取 primary.db 连接"""
+    conn = sqlite3.connect(str(PRIMARY_DB))
     conn.execute("PRAGMA journal_mode=WAL")
-    _ensure_tables(conn)
+    conn.execute("PRAGMA busy_timeout=30000")
     return conn
-
-
-def _ensure_tables(conn: sqlite3.Connection):
-    """确保 sectors 相关表存在"""
-    # 板块主表
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS sectors (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            code TEXT NOT NULL UNIQUE,
-            name TEXT NOT NULL,
-            name_pinyin_initial TEXT,
-            name_pinyin_full TEXT,
-            keywords TEXT,
-            created_at TEXT DEFAULT (datetime('now','localtime'))
-        )
-    """)
-    # FTS5全文索引表
-    conn.execute("""
-        CREATE VIRTUAL TABLE IF NOT EXISTS sectors_fts USING fts5(
-            name,
-            keywords,
-            content='sectors',
-            content_rowid='id'
-        )
-    """)
-    # 同步触发器
-    conn.execute("""
-        CREATE TRIGGER IF NOT EXISTS sectors_ai AFTER INSERT ON sectors BEGIN
-            INSERT INTO sectors_fts(rowid, name, keywords)
-            VALUES (new.id, new.name, new.keywords);
-        END
-    """)
-    conn.execute("""
-        CREATE TRIGGER IF NOT EXISTS sectors_ad AFTER DELETE ON sectors BEGIN
-            INSERT INTO sectors_fts(sectors_fts, rowid, name, keywords)
-            VALUES ('delete', old.id, old.name, old.keywords);
-        END
-    """)
-    conn.execute("""
-        CREATE TRIGGER IF NOT EXISTS sectors_au AFTER UPDATE ON sectors BEGIN
-            INSERT INTO sectors_fts(sectors_fts, rowid, name, keywords)
-            VALUES ('delete', old.id, old.name, old.keywords);
-            INSERT INTO sectors_fts(rowid, name, keywords)
-            VALUES (new.id, new.name, new.keywords);
-        END
-    """)
 
 
 def count() -> int:

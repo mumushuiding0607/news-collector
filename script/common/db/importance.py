@@ -1,46 +1,20 @@
 """
 db/importance.py - 新闻评分表 CRUD
 
+重要：
+  表结构定义在 db/schema.sql 中，不要在此文件中硬编码建表语句。
+
 表结构 (importance):
   id, news_id, source_name, title, url, publish_time,
   summary, related_sectors, importance_score, reason,
   direction, intensity, expected_change, duration,
   expectation_level, market_mode, created_at
+
+初始化：
+  表由 schema.sql 统一创建，如需单独初始化可调用 init_db()。
 """
 
 from .connection import get_conn
-
-
-# ---------------------------------------------------------------------------
-# 表初始化
-# ---------------------------------------------------------------------------
-
-def ensure_table():
-    """确保 importance 表存在（如不存在则创建）"""
-    conn = get_conn()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS importance (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            news_id INTEGER NOT NULL,
-            source_name TEXT NOT NULL,
-            title TEXT,
-            url TEXT,
-            publish_time TEXT,
-            summary TEXT,
-            related_sectors TEXT,
-            importance_score INTEGER DEFAULT 0,
-            reason TEXT,
-            direction TEXT,
-            intensity INTEGER,
-            expected_change TEXT,
-            duration TEXT,
-            expectation_level TEXT,
-            market_mode TEXT,
-            created_at TEXT DEFAULT (datetime('now','localtime'))
-        )
-    """)
-    conn.commit()
-    conn.close()
 
 
 # ---------------------------------------------------------------------------

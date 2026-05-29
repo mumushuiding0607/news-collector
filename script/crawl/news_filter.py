@@ -58,7 +58,7 @@ def build_batch_prompt(news_list: list[dict], template: str) -> str:
     return template.replace("<<news_list>>", news_lines)
 
 
-def parse_batch_response(text_blocks: list[str], total: int, debug: bool = False) -> list[dict | None]:
+def parse_batch_response(text_blocks: list[str], total: int, debug: bool = True) -> list[dict | None]:
     """
     从 LLM 返回中解析批量评估结果。
 
@@ -68,13 +68,16 @@ def parse_batch_response(text_blocks: list[str], total: int, debug: bool = False
     results = [None] * total
     combined = "\n".join(text_blocks)
 
-    if debug:
-        print(f"  [DEBUG] 原始返回（前500字符）: {combined[:500]}")
+    print(f"  [DEBUG] 原始返回长度: {len(combined)} 字符")
+    print(f"  [DEBUG] 原始返回（前1000字符）:\n{combined[:1000]}")
+    print(f"  [DEBUG] text_blocks 数量: {len(text_blocks)}")
 
     # 策略1：找 JSON 数组 [...]  先整体合并再匹配
     combined_stripped = re.sub(r'```json\s*', '', combined)
     combined_stripped = re.sub(r'```\s*', '', combined_stripped)
     combined_stripped = combined_stripped.strip()
+
+    print(f"  [DEBUG] 清理后内容（前500字符）: {combined_stripped[:500]}")
 
     m = re.search(r'\[[\s\S]*\]', combined_stripped)
     if m:
@@ -118,8 +121,14 @@ def parse_batch_response(text_blocks: list[str], total: int, debug: bool = False
         i += 1
 
     found = sum(1 for r in results if r is not None)
-    if debug:
-        print(f"  [DEBUG] 括号计数解析命中 {found}/{total}")
+    print(f"  [DEBUG] 括号计数解析命中 {found}/{total}")
+
+    if found == 0:
+        print(f"  [DEBUG] 解析失败！检查返回内容是否包含 will_flunctuate 字段")
+        print(f"  [DEBUG] 返回内容中是否包含 'will_flunctuate': {combined_stripped.__contains__('will_flunctuate')}")
+        print(f"  [DEBUG] 返回内容中是否包含 'id': {combined_stripped.__contains__('id')}")
+        print(f"  [DEBUG] 返回内容中是否包含 '[': {combined_stripped.__contains__('[')}")
+
     return results
 
 
@@ -144,6 +153,12 @@ async def process_batch_llm(news_batch: list[dict], timeout: int = 120, max_retr
             log(f"  [RETRY] 第 {attempt} 次尝试，当前批次 {len(news_batch)} 条")
 
         raw_result = await call_async_raw(prompt, timeout=timeout)
+
+        print(f"  [DEBUG] call_async_raw 返回类型: {type(raw_result)}, 是否为 None: {raw_result is None}")
+        if raw_result is not None:
+            print(f"  [DEBUG] text_blocks 数量: {len(raw_result)}")
+            for idx, block in enumerate(raw_result):
+                print(f"  [DEBUG] block[{idx}] 长度: {len(block)}, 内容: {block[:200]}")
 
         if raw_result is None:
             log(f"  [RETRY] 第 {attempt} 次返回 None {"(最后一次)" if attempt == max_retries else ""}")
