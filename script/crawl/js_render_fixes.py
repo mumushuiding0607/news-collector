@@ -39,6 +39,10 @@ JS_RENDER_SOURCES: dict[str, dict] = {
         "wait_until": "networkidle",
         "delay": 8.0,
     },
+    "快科技": {
+        "wait_until": "networkidle",
+        "delay": 8.0,
+    },
 }
 
 

@@ -79,12 +79,12 @@ def extract_article_links_with_dates(markdown: str, source_name: str) -> list[di
         if not line:
             i += 1
             continue
-        m = re.search(r'\[([^\]]+)\]\((https?://[^\)]+)\)', line)
+        m = re.search(r'\[([^\]]+)\]\((https?://[^\s")]+)\)', line)
         if not m:
             i += 1
             continue
         title = m.group(1).strip()
-        url = m.group(2).strip()
+        url = m.group(2).strip().rstrip('"').rstrip(')')
         if not title or len(title) <= 5 or not url or len(url) <= 10:
             i += 1
             continue

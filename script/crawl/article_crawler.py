@@ -21,6 +21,7 @@ from script.crawl.js_render_fixes import build_js_run_cfg
 
 
 BASE_DIR = Path(__file__).parent.parent.parent.resolve()
+SOURCES_PATH = BASE_DIR / "config" / "sources.json"
 LOG_DIR = BASE_DIR / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 today = date.today()
@@ -36,12 +37,65 @@ def log(msg: str):
         f.write(line + "\n")
 
 
+def _get_content_extract_pattern(source_name: str) -> str | None:
+    """从 sources.json 获取指定数据源的 contentExtract 正则，无则返回 None"""
+    try:
+        sources_data = json.loads(SOURCES_PATH.read_text(encoding="utf-8"))
+        for s in sources_data.get("sources", []):
+            if s.get("name") == source_name:
+                ce = s.get("contentExtract", "")
+                return ce if ce else None
+    except Exception:
+        pass
+    return None
+
+
+def _is_flash_source(source_name: str) -> bool:
+    """从 sources.json 判断指定数据源是否为快讯（标题即正文）"""
+    try:
+        sources_data = json.loads(SOURCES_PATH.read_text(encoding="utf-8"))
+        for s in sources_data.get("sources", []):
+            if s.get("name") == source_name:
+                return bool(s.get("is_flash", False))
+    except Exception:
+        pass
+    return False
+
+
+def _extract_by_content_pattern(html: str, pattern: str) -> str:
+    """使用 contentExtract 正则从 HTML 提取正文，返回提取的原始 HTML 片段"""
+    if not pattern or not html:
+        return ""
+    import re
+    try:
+        m = re.search(pattern, html, re.DOTALL)
+        if m:
+            return m.group(1) or ""
+    except Exception:
+        pass
+    return ""
+
+
 async def crawl_article(article: dict, crawler) -> dict | str:
     """抓取单篇文章正文，返回 dict（成功）或 str（失败原因）"""
     name = article["source_name"]
     url = article["url"]
     title = article["title"]
     news_id = article["id"]
+
+    # 快讯（标题即正文）：从 sources.json 判断
+    is_flash = _is_flash_source(name)
+    if is_flash:
+        content = article.get("subtitle") or article.get("title", "")
+        return {
+            "id": news_id,
+            "source_name": name,
+            "title": title,
+            "url": url,
+            "publish_time": article.get("publish_time", ""),
+            "content": content,
+            "content_length": len(content),
+        }
 
     if not url:
         return 'no_url'
@@ -77,9 +131,23 @@ async def crawl_article(article: dict, crawler) -> dict | str:
             log(f"  [WARN] 无法确认日期: {url}")
             return 'no_date'
 
-        content = extract_clean_content(html, base_url=url)
-        if len(content) < 200:
-            log(f"  [WARN] 正文过短（{len(content)}字）: {url}")
+        # 优先使用 sources.json 中该数据源的 contentExtract 正则预提取
+        content = ""
+        ce_pattern = _get_content_extract_pattern(name)
+        if ce_pattern:
+            raw_html = _extract_by_content_pattern(html, ce_pattern)
+            if raw_html and len(raw_html) >= 100:
+                content = extract_clean_content(f"<div>{raw_html}</div>", base_url=url)
+                if not content or len(content) < 100:
+                    # contentExtract 捕获的 HTML 片段内容太少，尝试直接对完整 HTML 提取
+                    content = extract_clean_content(html, base_url=url)
+            else:
+                content = extract_clean_content(html, base_url=url)
+        else:
+            content = extract_clean_content(html, base_url=url)
+
+        if len(content) == 0:
+            log(f"  [WARN] 正文为空（提取失败）: {url}")
             return 'content_too_short'
 
         return {
@@ -162,7 +230,7 @@ async def main():
             fetched = ret
             conn.execute("""
                 UPDATE primary_sources
-                SET content=?, content_length=?, publish_time=?, content_fetched_at=datetime('now','localtime')
+                SET content=?, content_length=?, publish_time=?, content_fetched_at=datetime('now','localtime'), status='read'
                 WHERE id=?
             """, (fetched["content"], fetched["content_length"], fetched["publish_time"], news_id))
             conn.commit()

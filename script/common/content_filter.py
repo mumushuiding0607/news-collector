@@ -119,17 +119,160 @@ BOILERPLATE_PATTERNS = [
     (r"^人民日报主管.*?有限公司主办\s*$", re.MULTILINE),
     # 来源行残留 (来源：中国能源网2026年05月26日 17:42)
     (r"^来源[：:]\s*[^\n]+\d{4}[年-]\d{2}[月-]\d{2}[日]?\s*\d{2}:\d{2}.*$", re.MULTILINE | re.IGNORECASE),
+    # 人民网底部噪音：热门排行、微信扫一扫、热门推荐
+    (r"^热门排行\s*\d[^\n]+$", re.MULTILINE),
+    (r"^微信[扫扫]?一扫[^\n]*$", re.MULTILINE),
+    (r"^提供新闻线索[^\n]*$", re.MULTILINE),
+    (r"^(?:人民智云|人民智作|热门排行|热门推荐|推荐阅读)[^>\n]*$", re.MULTILINE),
+    (r"^[^\n]*-->.*$", re.MULTILINE),  # 箭头链接残留
+    (r"^[^\n]*→.*$", re.MULTILINE),     # 箭头链接残留
+    # 人民网底部：客户端下载、人民日报少年等
+    (r"^(?:客户端下载|人民日报|人民日报少年|人民网\+|手机人民网|领导留言板|人民视频|人民智云|人民智作)[^\n]*$", re.MULTILINE),
+    (r"^关注公众号[^\n]*$", re.MULTILINE),
+    (r"^分享让更多人看到[^\n]*$", re.MULTILINE),
 ]
+
+
+def _score_line(line: str) -> float:
+    """
+    给单行文本打分，0-1之间，分数越高越可能是正文。
+
+    评分维度：
+      1. 长度得分：短行(<10字)倾向是导航，长行更可能正文
+      2. 链接密度：链接文字占比高→噪音
+      3. 字符类型：汉字/中文标点占比高→正文
+      4. 可读性：数字、英文、特殊符号占比高→噪音（导航/代码）
+      5. 位置标记词：含"首页/新闻/资讯/关于"等→噪音
+    """
+    if not line or not line.strip():
+        return 0.0
+
+    line_stripped = line.strip()
+    line_len = len(line_stripped)
+
+    # 1. 长度得分：太短→低分，30-200字最佳
+    if line_len < 5:
+        return 0.1
+    elif line_len < 15:
+        length_score = 0.2
+    elif line_len < 30:
+        length_score = 0.5
+    elif line_len < 200:
+        length_score = 0.8
+    else:
+        length_score = 0.6
+
+    # 2. 链接密度（[xxx](url) 或 <a>xxx</a>）
+    link_pattern = r'\[[^\]]*\]\([^)]+\)|<a[^>]*>[^<]*</a>'
+    link_matches = re.findall(link_pattern, line)
+    link_text_len = sum(len(re.sub(r'[\[\](){}<>`]', '', m)) for m in link_matches)
+    link_density = link_text_len / line_len if line_len > 0 else 0
+
+    # 3. 字符类型得分：汉字占比高→正文
+    chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', line_stripped))
+    chinese_ratio = chinese_chars / line_len if line_len > 0 else 0
+
+    # 4. 数字/英文占比（导航常有数字编号、URL）
+    non_chinese = len(re.findall(r'[a-zA-Z0-9]', line_stripped))
+    foreign_ratio = non_chinese / line_len if line_len > 0 else 0
+
+    # 5. 噪音关键词
+    noise_keywords = [
+        '首页', '网站地图', '联系我们', '关于我们', '加入我们', '人才招聘',
+        '广告服务', '版权所有', 'copyright', '网站备案', 'ICP证',
+        '热门排行', '热门推荐', '推荐阅读', '相关阅读', '相关推荐',
+        '客户端下载', '扫码下载', '微信扫一扫', '关注公众号', '分享到',
+        '人民视频', '人民智云', '人民智作', '人民网+', '领导留言板',
+        '人民日报少年', '手机人民网', '新闻线索', '违法和不良信息',
+    ]
+    noise_count = sum(1 for kw in noise_keywords if kw in line_stripped)
+    noise_penalty = min(0.5, noise_count * 0.15)
+
+    # 综合得分计算
+    score = (
+        length_score * 0.2
+        + (1 - link_density) * 0.2
+        + chinese_ratio * 0.3
+        + (1 - foreign_ratio) * 0.15
+        - noise_penalty
+    )
+
+    # 特定模式加分：完整句子（有标点结尾）
+    if re.search(r'[。！？！？\.!?]$', line_stripped):
+        score += 0.1
+
+    return max(0.0, min(1.0, score))
+
+
+def _is_noise_line(line: str) -> bool:
+    """
+    快速判断是否是噪音行（不需要打分）。
+    """
+    line_stripped = line.strip()
+
+    # 空白行
+    if not line_stripped:
+        return True
+
+    # 太短且无实质内容
+    if len(line_stripped) < 3:
+        return True
+
+    # 全是分隔符/装饰符
+    if re.match(r'^[|\-=•○●◆■□▪▫◦▪*]{3,}$', line_stripped):
+        return True
+
+    # 纯数字/纯英文行（太短时）
+    if len(line_stripped) < 10 and re.match(r'^[a-zA-Z0-9\s\(\)\.,;:!?-]+$', line_stripped):
+        return True
+
+    return False
 
 
 def clean_boilerplate_text(text: str) -> str:
     """
     对提取后的纯文本进行 boilerplate 清理。
-    使用正则逐条匹配并删除匹配行。
+
+    流程：
+      1. 通用行评分过滤：低于阈值的行直接删除
+      2. 正则二次清理：去除残留的 Boilerplate 文本
+      3. 去重行清理：连续重复的行删除
     """
+    if not text:
+        return text
+
+    lines = text.split('\n')
+    cleaned_lines = []
+    prev_line = ""
+
+    for line in lines:
+        line_stripped = line.strip()
+
+        # 步骤1：快速噪音判断
+        if _is_noise_line(line_stripped):
+            continue
+
+        # 步骤2：行评分过滤
+        score = _score_line(line)
+        if score < 0.25:  # 低于0.25分的行丢弃
+            continue
+
+        # 步骤3：去重（与上一行完全相同则跳过）
+        if line_stripped == prev_line:
+            continue
+
+        cleaned_lines.append(line)
+        prev_line = line_stripped
+
+    text = '\n'.join(cleaned_lines)
+
+    # 步骤4：正则Boilerplate清理（保留通用规则，过滤站点特定噪音）
     for pattern, flags in BOILERPLATE_PATTERNS:
         text = re.sub(pattern, "", text, flags=flags)
-    text = re.sub(r"\n{3,}", "\n\n", text)
+
+    # 步骤5：清理多余空行
+    text = re.sub(r'\n{3,}', '\n\n', text)
+
     return text.strip()
 
 

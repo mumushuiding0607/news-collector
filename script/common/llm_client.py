@@ -77,11 +77,15 @@ def parse_response(text_blocks: list[str]) -> dict | None:
         # 去掉 code block 标记（```json ... ``` 或 ``` ... ```）
         tb = re.sub(r'^```json\s*', '', tb, flags=re.MULTILINE)
         tb = re.sub(r'^```\s*$', '', tb, flags=re.MULTILINE)
-        # 尝试找 JSON 对象
-        m = re.search(r'\{[\s\S]*\}', tb)
+        # 尝试找 JSON 对象或数组
+        m = re.search(r'[\[{][\s\S]*[\]}]', tb)
         if m:
             try:
-                return json.loads(m.group())
+                result = json.loads(m.group())
+                # 如果是数组且只包含一个元素，取第一个
+                if isinstance(result, list) and len(result) == 1:
+                    result = result[0]
+                return result
             except json.JSONDecodeError:
                 pass
 
@@ -94,13 +98,15 @@ def parse_response(text_blocks: list[str]) -> dict | None:
     return None
 
 
-def call(prompt: str, timeout: int = 30) -> dict | None:
+def call(prompt: str, timeout: int = 60, max_tokens: int = 2000, retry: int = 2) -> dict | None:
     """
     调用 Minimax LLM API。
 
     Args:
         prompt: 发送给 LLM 的提示词
-        timeout: 请求超时秒数
+        timeout: 请求超时秒数（默认60）
+        max_tokens: 生成的最大token数（默认2000）
+        retry: 失败重试次数（默认2）
 
     Returns:
         解析成功: dict（包含结构化字段）
@@ -114,44 +120,54 @@ def call(prompt: str, timeout: int = 30) -> dict | None:
 
     payload = {
         "model": _MINIMAX_MODEL,
-        "max_tokens": 600,
+        "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}]
     }
 
     url = f"{_MINIMAX_BASE_URL}/v1/messages"
 
-    try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
-        if resp.status_code != 200:
-            print(f"  [HTTP {resp.status_code}] {resp.text[:200]}")
-            return None
+    last_error = None
+    for attempt in range(retry + 1):
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
+            if resp.status_code != 200:
+                print(f"  [HTTP {resp.status_code}] {resp.text[:200]}")
+                last_error = f"HTTP {resp.status_code}"
+                continue
 
-        data = resp.json()
-        content_blocks = data.get("content", [])
+            data = resp.json()
+            content_blocks = data.get("content", [])
 
-        # 分离 thinking 和 text：thinking 截断至 500 字符避免干扰
-        text_blocks = []
-        for block in content_blocks:
-            btype = block.get("type", "")
-            if btype == "text":
-                text_blocks.append(block.get("text", ""))
-            elif btype == "thinking":
-                text_blocks.append(block.get("thinking", "")[:500])
+            # 分离 thinking 和 text：thinking 截断至 500 字符避免干扰
+            text_blocks = []
+            for block in content_blocks:
+                btype = block.get("type", "")
+                if btype == "text":
+                    text_blocks.append(block.get("text", ""))
+                elif btype == "thinking":
+                    text_blocks.append(block.get("thinking", "")[:500])
 
-        return parse_response(text_blocks)
+            return parse_response(text_blocks)
 
-    except requests.Timeout:
-        print(f"  [API ERR] 请求超时 timeout={timeout}s")
-        return None
-    except requests.ConnectionError as e:
-        print(f"  [API ERR] 连接错误: {e}")
-        return None
-    except json.JSONDecodeError as e:
-        print(f"  [API ERR] JSON解析失败: {e}, resp.text[:200]={resp.text[:200] if 'resp' in dir() else 'N/A'}")
-        return None
-    except Exception as e:
-        print(f"  [API ERR] {type(e).__name__}: {e}")
-        return None
+        except requests.Timeout:
+            print(f"  [API ERR] 请求超时 timeout={timeout}s")
+            last_error = "timeout"
+        except requests.ConnectionError as e:
+            print(f"  [API ERR] 连接错误: {e}")
+            last_error = f"connection error: {e}"
+        except json.JSONDecodeError as e:
+            print(f"  [API ERR] JSON解析失败: {e}")
+            last_error = f"JSON error: {e}"
+        except Exception as e:
+            print(f"  [API ERR] 未知错误: {e}")
+            last_error = f"error: {e}"
+
+        if attempt < retry:
+            import time
+            time.sleep(2 ** attempt)  # 指数退避: 1s, 2s, 4s...
+
+    print(f"  [API ERR] 全部重试失败，最后错误: {last_error}")
+    return None
 
 
 async def call_async_raw(prompt: str, timeout: int = 60) -> list[str] | None:

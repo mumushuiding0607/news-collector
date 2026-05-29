@@ -23,12 +23,13 @@ def get_all_urls() -> set[str]:
 
 
 def get_unread(limit: int = 10) -> list[tuple]:
-    """读取待评分的新闻（status='new'），按发布时间倒序"""
+    """读取最新批次中 status='read' 且待评分的新闻，按发布时间倒序"""
     conn = get_conn()
     cur = conn.execute("""
         SELECT id, source_name, title, url, subtitle, publish_time, content
         FROM primary_sources
-        WHERE status = 'new'
+        WHERE status = 'read'
+          AND batch_id = (SELECT MAX(batch_id) FROM primary_sources)
         ORDER BY publish_time DESC
         LIMIT ?
     """, (limit,))
@@ -130,8 +131,22 @@ def upsert_list_page_article(article: dict, commit: bool = True, batch_id: int =
 # 更新
 # ---------------------------------------------------------------------------
 
+def mark_scored(news_id: int, commit: bool = True):
+    """标记新闻为已评分"""
+    conn = get_conn()
+    try:
+        conn.execute(
+            "UPDATE primary_sources SET status='scored' WHERE id=?",
+            (news_id,)
+        )
+        if commit:
+            conn.commit()
+    finally:
+        conn.close()
+
+
 def mark_read(news_id: int, commit: bool = True):
-    """标记新闻为已读"""
+    """标记新闻为已读（兼容旧代码）"""
     conn = get_conn()
     try:
         conn.execute(
@@ -217,7 +232,7 @@ def get_failed_batch(conn=None) -> list[tuple]:
 
 def get_useful_uncrawled(conn=None) -> list[tuple]:
     """
-    读取 is_useful=1 且 content_fetched_at IS NULL 的记录（Step 3 用）。
+    读取最新批次中 is_useful=1 且 status='new' 的记录（Step 3 用）。
     """
     must_close = conn is None
     if conn is None:
@@ -227,7 +242,8 @@ def get_useful_uncrawled(conn=None) -> list[tuple]:
             SELECT id, source_name, title, url, subtitle, publish_time
             FROM primary_sources
             WHERE is_useful = 1
-              AND content_fetched_at IS NULL
+              AND status = 'new'
+              AND batch_id = (SELECT MAX(batch_id) FROM primary_sources)
             ORDER BY publish_time DESC
         """)
         return cur.fetchall()

@@ -14,7 +14,7 @@ db/ - 数据库模块
 
 from .connection import get_conn, init_db
 from .primary_source import (get_all_urls, get_unread, insert, upsert_list_page_article,
-                               mark_read, get_unfiltered_batch, mark_useful, get_useful_uncrawled,
+                               mark_scored, mark_read, get_unfiltered_batch, mark_useful, get_useful_uncrawled,
                                get_failed_batch)
 from .importance import ensure_table, insert as insert_importance, get_recent, get_by_score as get_recent_by_score, get_latest_batch
 from .sectors import normalize, fuzzy_match, search, sync_from_iwencai, count as sectors_count
@@ -28,6 +28,7 @@ __all__ = [
     "get_unread",
     "insert",
     "upsert_list_page_article",
+    "mark_scored",
     "mark_read",
     "get_unfiltered_batch",
     "mark_useful",

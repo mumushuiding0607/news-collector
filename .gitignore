@@ -2,6 +2,7 @@
 
 # 日志
 logs/
+test/
 
 # Python
 __pycache__/
@@ -15,9 +16,7 @@ __pycache__/
 *.swp
 *.swo
 
-# OS
-.DS_Store
-Thumbs.db
+
 
 # Crawl4AI
 .cache/

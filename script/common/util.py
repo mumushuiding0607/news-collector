@@ -92,8 +92,12 @@ def is_today(publish_time_str: str | None, today_date: date | None = None) -> bo
         return False
     if today_date is None:
         today_date = date.today()
-    # 提取日期部分：找到前10个字符（YYYY-MM-DD）
-    date_part = publish_time_str[:10]
+    # 先规范化日期字符串再提取日期部分（兼容 2026年05月29日、2026-05-29 等多种格式）
+    normalized = _normalize_to_iso(publish_time_str)
+    if normalized:
+        date_part = normalized[:10]
+    else:
+        date_part = publish_time_str[:10]
     try:
         pub_date = datetime.strptime(date_part, "%Y-%m-%d").date()
         return pub_date == today_date

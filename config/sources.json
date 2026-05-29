@@ -2,6 +2,7 @@
   "sources": [
     {
       "name": "中国能源网",
+      "is_flash": false,
       "url": "https://cnenergynews.cn/",
       "contentExtract": "<article[^>]*>([\\s\\S]*?)</article>",
       "publishTimeExtract": {
@@ -16,8 +17,9 @@
     },
     {
       "name": "快科技",
+      "is_flash": false,
       "url": "https://www.mydrivers.com/",
-      "contentExtract": "<div class=\"news_info\"[^>]*>([\\s\\S]*?)</div>",
+      "contentExtract": "<div[^>]*class=\"news_info\"[^>]*>([\\s\\S]*?)(?:<div[^>]*class=\"(?:zhuanzai|url|jubao_text|bqian)\"|<p[^>]*class=\"(?:zhuanzai|url)\")",
       "publishTimeExtract": {
         "pattern": "g_PostDateStr\\s*=\\s*new\\s+Date\\(['\"](\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2})",
         "fallbackPattern": "(\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2})",
@@ -30,34 +32,22 @@
     },
     {
       "name": "人民网",
+      "is_flash": false,
       "url": "http://www.people.com.cn/GB/59476/index.html",
-      "contentExtract": "<div[^>]*id=\"rm_txt_zw\"[^>]*>([\\s\\S]*?)</div>\\s*</div>\\s*</div>",
+      "contentExtract": "<div class=\"rm_txt_con cf\"[^>]*>([\\s\\S]*?)</div>\\s*</div>\\s*</div>",
       "publishTimeExtract": {
-        "pattern": "<meta name=\"publishdate\" content=\"(\\d{4}-\\d{2}-\\d{2})\"",
-        "fallbackPattern": "(\\d{4}-\\d{2}-\\d{2})",
+        "pattern": "<meta\\s+name=\"publishdate\"\\s+content=\"(\\d{4}-\\d{2}-\\d{2})\"",
+        "fallbackPattern": "<time[^>]*datetime=\"([^\"]+)\"",
         "selector": {
-          "css": "meta[name='publishdate']",
+          "css": "meta[name='publishdate'], div[class*='time'], span[class*='time'], p[class*='time']",
           "mode": "attribute:content"
         },
-        "description": "人民网日期在meta publishdate中"
-      }
-    },
-    {
-      "name": "美联储官网",
-      "url": "https://www.federalreserve.gov/",
-      "contentExtract": "<div[^>]*id=\"article\"[^>]*>([\\s\\S]*?)</div>\\s*</div>",
-      "publishTimeExtract": {
-        "pattern": "<time[^>]+datetime=[\"']([\\d]{4}-[\\d]{2}-[\\d]{2}|\\d{4}-\\d{2}-\\d{2}T[\\d:\\.]+Z)[\"'][^>]*>(.*?)<\\/time>|<(?:span|div|p)[^>]*(?:class=[\"'][^\"']*\\b(time|date|publish|posted|updated)\\b[^\"']*|id=[\"'][^\"']*\\b(time|date|publish)\\b)[^>]*>\\s*(\\d{1,2}[\\s\\/\\-\\.]\\d{1,2}[\\s\\/\\-\\.]\\d{2,4}|\\w+\\s+\\d{1,2},?\\s+\\d{4}|\\d{1,2}\\s+\\w+\\s+\\d{4})\\s*<",
-        "fallbackPattern": "<meta(?:\\s+[^>]*)?\\s+(?:property|itemprop)=\"(?:article:published_time|publish-date|pubdate|publication_date|published)\"[^>]*content=\"([^\"]+)\"",
-        "selector": {
-          "css": "time[datetime], meta[property='og:published_time'], .pubdate, [class*='date']:not(a), [class*='time']",
-          "mode": "attribute:datetime"
-        },
-        "description": "该页面为功能性页面而非传统新闻文章（显示'Connect with the Board'），没有内置发布日期。美联储官网的文章页面上通常使用<time datetime='YYYY-MM-DD'>或meta标签存储发布时间。模式先尝试匹配HTML5语义化time标签的datetime属性，再fallback到meta标签中的og:published_time。URL中也不含日期路径，故不从此提取"
+        "description": "人民网在<head>部分的meta标签中提供了精确的publishdate信息，格式为YYYY-MM-DD（如2026-05-29）。这是最可靠的发布时间来源。fallback模式尝试匹配HTML5的time标签的datetime属性。selector提供了CSS选择器方案用于正则失败时的备选提取。"
       }
     },
     {
       "name": "中国半导体行业协会",
+      "is_flash": false,
       "url": "https://web.csia.net.cn/rdxw",
       "contentExtract": "<div[^>]*(?:class=\"[^\"]*content[^\"]*\"[^>]*|id=\"[^\"]*content[^\"]*\"[^>]*|class=\"[^\"]*article[^\"]*\"[^>]*|class=\"[^\"]*detail[^\"]*\"[^>]*|class=\"[^\"]*text[^\"]*\"[^>]*)[^>]*>([\\s\\S]*?)<\\/div>\\s*<div[^>]*(?:class=\"[^\"]*page[^\"]*\"[^>]*|class=\"[^\"]*pages[^\"]*\"[^>]*|class=\"[^\"]*next[^\"]*\")",
       "publishTimeExtract": {
@@ -72,13 +62,15 @@
     },
     {
       "name": "中国稀土行业协会",
+      "is_flash": false,
       "url": "https://ac-rei.org.cn/",
       "contentExtract": "<div class=\"content\\s*\"[^>]*>([\\s\\S]*?)</div>"
     },
     {
       "name": "中国有色金属工业网",
+      "is_flash": false,
       "url": "https://www.chinania.org.cn/html/hangyexinwen/guoneixinwen/",
-      "contentExtract": "<div[^>]*class=\"[^\"]*\\b(article|content|text|detail|news|post|entry)\\b[^\"]*\"[^>]*>([\\s\\S]*?)</div>\\s*</div>\\s*<div[^>]*class=\"[^\"]*\\b(footer|sidebar|related|share|comment)\\b",
+      "contentExtract": "<div[^>]*class=\"[^\"]*\\barticle_content\\b[^\"]*\"[^>]*>[\\s\\S]*?<div>([\\s\\S]*?)</div>[\\s\\S]*?<div[^>]*class=\"[^\"]*\\b(?:bshare|footer)\\b",
       "publishTimeExtract": {
         "pattern": "<(?:meta[^>]*property=\"[^\"]*(?:published_time|pubdate)[^\"]*\"[^>]*content=\"(\\d{4}[-/]\\d{2}[-/]\\d{2}[T\\s]\\d{2}:\\d{2}:\\d{2})|\"[^\"]*\"[^>]*>|time[^>]*datetime=\"(\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}:\\d{2}[^\"]*)\"[^>]*)>",
         "fallbackPattern": "(20\\d{2}[-/年]\\d{1,2}[-/月]\\d{1,2}[日]?)",
@@ -91,6 +83,7 @@
     },
     {
       "name": "SMM有色快讯",
+      "is_flash": true,
       "url": "https://news.smm.cn/live",
       "contentExtract": "<article[^>]*>([\\s\\S]*?)<\\/article>|<div[^>]*(?:class|id)=[\"'][^\"']*(?:article|content|detail|news|post|entry|body)[\"'][^>]*>([\\s\\S]*?)<\\/div>(?=\\s*<div[^>]*(?:class|id)=[\"'][^\"']*(?:related|comment|sidebar|footer|nav))",
       "publishTimeExtract": {
@@ -105,6 +98,7 @@
     },
     {
       "name": "生意社",
+      "is_flash": true,
       "url": "https://www.100ppi.com/kx/list-message--1.html",
       "contentExtract": "<div class=\"pr-news-txt\">(.*?)</div>",
       "publishTimeExtract": {
@@ -119,6 +113,7 @@
     },
     {
       "name": "中国电子元件",
+      "is_flash": false,
       "url": "https://www.ic-ceca.org.cn/hangyezixun.html",
       "contentExtract": "<div[^>]*class=\"[^\"]*fzjg_cont(?:_\\d)?[^\"]*\"[^>]*>\\s*<div[^>]*class=\"text\"[^>]*>([\\s\\S]*?)</div>\\s*</div>",
       "publishTimeExtract": {
@@ -133,6 +128,7 @@
     },
     {
       "name": "农业农村部",
+      "is_flash": false,
       "url": "https://www.moa.gov.cn/xw/zxfb/",
       "contentExtract": "<div[^>]*class=\"[^\"]*\\bTRS_Editor\\b[^\"]*\"[^>]*>([\\s\\S]*?)</div>\\s*</div>",
       "publishTimeExtract": {
@@ -146,7 +142,7 @@
       }
     }
   ],
-  "crawNumPerSource": 10,
+  "crawNumPerSource": 20,
   "maxConsecutiveNonToday": 10,
   "llmBatchSize": 100,
   "llmTimeout": 300,
