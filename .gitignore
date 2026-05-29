@@ -1,6 +1,4 @@
 # 数据库
-*.db-shm
-*.db-wal
 
 # 日志
 logs/

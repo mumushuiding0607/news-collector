@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from common.content_filter import get_content_filter, extract_clean_content
 from common.db import get_conn, init_db, get_useful_uncrawled
 from common.util import extract_date_from_html, is_today
+from script.crawl.js_render_fixes import build_js_run_cfg
 
 
 BASE_DIR = Path(__file__).parent.parent.parent.resolve()
@@ -45,14 +46,19 @@ async def crawl_article(article: dict, crawler) -> dict | str:
     if not url:
         return 'no_url'
 
-    run_cfg = CrawlerRunConfig(
-        word_count_threshold=50,
-        verbose=False,
-        delay_before_return_html=5.0,
-        markdown_generator=DefaultMarkdownGenerator(
-            content_filter=get_content_filter()
-        ),
-    )
+    # JS 渲染站点使用增强配置
+    js_cfg = build_js_run_cfg(name)
+    if js_cfg:
+        run_cfg = js_cfg
+    else:
+        run_cfg = CrawlerRunConfig(
+            word_count_threshold=50,
+            verbose=False,
+            delay_before_return_html=5.0,
+            markdown_generator=DefaultMarkdownGenerator(
+                content_filter=get_content_filter()
+            ),
+        )
     try:
         result = await crawler.arun(url=url, config=run_cfg)
         if not result.success:
@@ -60,7 +66,7 @@ async def crawl_article(article: dict, crawler) -> dict | str:
             return 'crawl_failed'
 
         html = result.html or ""
-        pub_time = extract_date_from_html(html, url=url)
+        pub_time = extract_date_from_html(html, url=url, source_name=name)
 
         # 如果文章页无法提取日期，保留原有列表页日期
         if not pub_time and article.get("publish_time"):

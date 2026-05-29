@@ -2,51 +2,155 @@
   "sources": [
     {
       "name": "中国能源网",
-      "url": "https://cnenergynews.cn/"
+      "url": "https://cnenergynews.cn/",
+      "contentExtract": "<article[^>]*>([\\s\\S]*?)</article>",
+      "publishTimeExtract": {
+        "pattern": "article:published_time\" content=\"(\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2})\"",
+        "fallbackPattern": "(\\d{4}-\\d{2}-\\d{2})\\s+\\d{2}:\\d{2}:\\d{2}",
+        "selector": {
+          "css": "meta[property='article:published_time'], time[datetime], .publish-time, .article-time, .time-info",
+          "mode": "attribute:datetime"
+        },
+        "description": "发布时间存储在<meta property='article:published_time'>标签中，格式为标准ISO格式'YYYY-MM-DD HH:MM:SS'，时间值精确到秒级，属于结构化数据，不会因页面渲染而丢失"
+      }
     },
     {
       "name": "快科技",
-      "url": "https://www.mydrivers.com/"
+      "url": "https://www.mydrivers.com/",
+      "contentExtract": "<div class=\"news_info\"[^>]*>([\\s\\S]*?)</div>",
+      "publishTimeExtract": {
+        "pattern": "g_PostDateStr\\s*=\\s*new\\s+Date\\(['\"](\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2})",
+        "fallbackPattern": "(\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2})",
+        "selector": {
+          "css": "div.news_info",
+          "mode": "text"
+        },
+        "description": "快科技日期在JS变量g_PostDateStr中"
+      }
     },
     {
       "name": "人民网",
-      "url": "http://www.people.com.cn/GB/59476/index.html"
+      "url": "http://www.people.com.cn/GB/59476/index.html",
+      "contentExtract": "<div[^>]*id=\"rm_txt_zw\"[^>]*>([\\s\\S]*?)</div>\\s*</div>\\s*</div>",
+      "publishTimeExtract": {
+        "pattern": "<meta name=\"publishdate\" content=\"(\\d{4}-\\d{2}-\\d{2})\"",
+        "fallbackPattern": "(\\d{4}-\\d{2}-\\d{2})",
+        "selector": {
+          "css": "meta[name='publishdate']",
+          "mode": "attribute:content"
+        },
+        "description": "人民网日期在meta publishdate中"
+      }
     },
     {
       "name": "美联储官网",
-      "url": "https://www.federalreserve.gov/"
+      "url": "https://www.federalreserve.gov/",
+      "contentExtract": "<div[^>]*id=\"article\"[^>]*>([\\s\\S]*?)</div>\\s*</div>",
+      "publishTimeExtract": {
+        "pattern": "<time[^>]+datetime=[\"']([\\d]{4}-[\\d]{2}-[\\d]{2}|\\d{4}-\\d{2}-\\d{2}T[\\d:\\.]+Z)[\"'][^>]*>(.*?)<\\/time>|<(?:span|div|p)[^>]*(?:class=[\"'][^\"']*\\b(time|date|publish|posted|updated)\\b[^\"']*|id=[\"'][^\"']*\\b(time|date|publish)\\b)[^>]*>\\s*(\\d{1,2}[\\s\\/\\-\\.]\\d{1,2}[\\s\\/\\-\\.]\\d{2,4}|\\w+\\s+\\d{1,2},?\\s+\\d{4}|\\d{1,2}\\s+\\w+\\s+\\d{4})\\s*<",
+        "fallbackPattern": "<meta(?:\\s+[^>]*)?\\s+(?:property|itemprop)=\"(?:article:published_time|publish-date|pubdate|publication_date|published)\"[^>]*content=\"([^\"]+)\"",
+        "selector": {
+          "css": "time[datetime], meta[property='og:published_time'], .pubdate, [class*='date']:not(a), [class*='time']",
+          "mode": "attribute:datetime"
+        },
+        "description": "该页面为功能性页面而非传统新闻文章（显示'Connect with the Board'），没有内置发布日期。美联储官网的文章页面上通常使用<time datetime='YYYY-MM-DD'>或meta标签存储发布时间。模式先尝试匹配HTML5语义化time标签的datetime属性，再fallback到meta标签中的og:published_time。URL中也不含日期路径，故不从此提取"
+      }
     },
     {
       "name": "中国半导体行业协会",
-      "url": "https://web.csia.net.cn/rdxw"
+      "url": "https://web.csia.net.cn/rdxw",
+      "contentExtract": "<div[^>]*(?:class=\"[^\"]*content[^\"]*\"[^>]*|id=\"[^\"]*content[^\"]*\"[^>]*|class=\"[^\"]*article[^\"]*\"[^>]*|class=\"[^\"]*detail[^\"]*\"[^>]*|class=\"[^\"]*text[^\"]*\"[^>]*)[^>]*>([\\s\\S]*?)<\\/div>\\s*<div[^>]*(?:class=\"[^\"]*page[^\"]*\"[^>]*|class=\"[^\"]*pages[^\"]*\"[^>]*|class=\"[^\"]*next[^\"]*\")",
+      "publishTimeExtract": {
+        "pattern": "og:published_time[\\s]*content=[\\\"']([\\d]{4}-[\\d]{2}-[\\d]{2}T[\\d]{2}:[\\d]{2}:[\\d]{2})",
+        "fallbackPattern": "(?:于|发布于|发布时间[：:])\\s*(\\d{4}[-/年]\\d{1,2}[-/月]\\d{1,2}[日]?)",
+        "selector": {
+          "css": "div.time-info, span.time, p.info, div.date, time[datetime], [class*='time']",
+          "mode": "text"
+        },
+        "description": "该网站的发布时间通常位于文章标题下方，使用class包含time/date/info的容器包裹。日期格式多为'YYYY-MM-DD'或'YYYY年MM月DD日'，可能包含具体时间。正则优先匹配这些结构化的时间容器，如果失败则使用'于/发布于/发布时间'等前缀文本作为兜底"
+      }
     },
     {
       "name": "中国稀土行业协会",
-      "url": "https://ac-rei.org.cn/"
+      "url": "https://ac-rei.org.cn/",
+      "contentExtract": "<div class=\"content\\s*\"[^>]*>([\\s\\S]*?)</div>"
     },
     {
       "name": "中国有色金属工业网",
-      "url": "https://www.chinania.org.cn/html/hangyexinwen/guoneixinwen/"
+      "url": "https://www.chinania.org.cn/html/hangyexinwen/guoneixinwen/",
+      "contentExtract": "<div[^>]*class=\"[^\"]*\\b(article|content|text|detail|news|post|entry)\\b[^\"]*\"[^>]*>([\\s\\S]*?)</div>\\s*</div>\\s*<div[^>]*class=\"[^\"]*\\b(footer|sidebar|related|share|comment)\\b",
+      "publishTimeExtract": {
+        "pattern": "<(?:meta[^>]*property=\"[^\"]*(?:published_time|pubdate)[^\"]*\"[^>]*content=\"(\\d{4}[-/]\\d{2}[-/]\\d{2}[T\\s]\\d{2}:\\d{2}:\\d{2})|\"[^\"]*\"[^>]*>|time[^>]*datetime=\"(\\d{4}-\\d{2}-\\d{2}[T\\s]\\d{2}:\\d{2}:\\d{2}[^\"]*)\"[^>]*)>",
+        "fallbackPattern": "(20\\d{2}[-/年]\\d{1,2}[-/月]\\d{1,2}[日]?)",
+        "selector": {
+          "css": "div.time-info, span.publish-time, div.info span:first-child, time[datetime]",
+          "mode": "text"
+        },
+        "description": "该网站发布时间位于标题下方的time-info或publish-time类div中，格式为2023年06月09日或2023/06/09。主正则匹配class含time/date/publish/info的div中的日期；兜底正则匹配4位年份开头的常见日期格式；CSS选择器用于结构化提取"
+      }
     },
     {
       "name": "SMM有色快讯",
-      "url": "https://news.smm.cn/live"
+      "url": "https://news.smm.cn/live",
+      "contentExtract": "<article[^>]*>([\\s\\S]*?)<\\/article>|<div[^>]*(?:class|id)=[\"'][^\"']*(?:article|content|detail|news|post|entry|body)[\"'][^>]*>([\\s\\S]*?)<\\/div>(?=\\s*<div[^>]*(?:class|id)=[\"'][^\"']*(?:related|comment|sidebar|footer|nav))",
+      "publishTimeExtract": {
+        "pattern": "<(?:meta[^>]*property=\"og:published_time\"[^>]*content=\"([^\"]+)\"|time[^>]*datetime=\"([^\"]+)\"[^>]*>|div[^>]*class=\"[^\"]*(?:publish-time|time-info|time)[^\"]*\"[^>]*>[^<]*(\\d{4}[-年]\\d{1,2}[-月]\\d{1,2}[日]?\\s*\\d{1,2}:\\d{1,2}(?::\\d{1,2})?))",
+        "fallbackPattern": "20\\d{2}[-年/]\\d{1,2}[-月/]\\d{1,2}[日]?\\s*\\d{1,2}:\\d{1,2}(?::\\d{1,2})?|\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}",
+        "selector": {
+          "css": "time[datetime], div[class*='time'], span[class*='time'], span[class*='date'], .publish-time, .time-info",
+          "mode": "text|attribute:datetime"
+        },
+        "description": "主正则匹配JSON配置中的publish/time等字段格式（如2026-01-01 10:00）;兜底正则匹配多种日期格式;CSS选择器优先查找time[datetime]属性和含time关键字的class元素"
+      }
     },
     {
       "name": "生意社",
-      "url": "https://www.100ppi.com/kx/list-message--1.html"
+      "url": "https://www.100ppi.com/kx/list-message--1.html",
+      "contentExtract": "<div class=\"pr-news-txt\">(.*?)</div>",
+      "publishTimeExtract": {
+        "pattern": "(20\\d{2}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})",
+        "fallbackPattern": "\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}",
+        "selector": {
+          "css": ".pr-news-tit span",
+          "mode": "text"
+        },
+        "description": "时间信息嵌入在 class=\"pr-news-tit\" 的 div 内部的 <span> 标签中，格式为 '2026-05-28 16:39:28'，包含年月日和时分秒。主正则精确匹配 <span> 标签包裹的日期时间格式。正文附近的时间 span 是最可靠的时间来源。"
+      }
     },
     {
       "name": "中国电子元件",
-      "url": "https://www.ic-ceca.org.cn/hangyezixun.html"
+      "url": "https://www.ic-ceca.org.cn/hangyezixun.html",
+      "contentExtract": "<div[^>]*class=\"[^\"]*fzjg_cont(?:_\\d)?[^\"]*\"[^>]*>\\s*<div[^>]*class=\"text\"[^>]*>([\\s\\S]*?)</div>\\s*</div>",
+      "publishTimeExtract": {
+        "pattern": "<span[^>]*class=\"[^\"]*time[^\"]*\"[^>]*>([^<]*)</span>",
+        "fallbackPattern": "<time[^>]*(?:datetime=\"([^\"]+)\"|>\\s*(\\d{4}-\\d{2}-\\d{2}))",
+        "selector": {
+          "css": "span.time, span.date, div.info span, .article-info span",
+          "mode": "text"
+        },
+        "description": "该网站将发布时间放置在包含'time'或'date' class的span标签中，格式为'YYYY-MM-DD'。主正则精确匹配这类span元素并捕获日期文本。兜底正则优先匹配time标签的datetime属性，其次匹配标签文本。"
+      }
     },
     {
       "name": "农业农村部",
-      "url": "https://www.moa.gov.cn/xw/zxfb/"
+      "url": "https://www.moa.gov.cn/xw/zxfb/",
+      "contentExtract": "<div[^>]*class=\"[^\"]*\\bTRS_Editor\\b[^\"]*\"[^>]*>([\\s\\S]*?)</div>\\s*</div>",
+      "publishTimeExtract": {
+        "pattern": "<div[^>]*class=\"[^\"]*\\btime\\b[^\"]*\"[^>]*>\\s*([\\d{4}-\\d{2}-\\d{2}]?)",
+        "fallbackPattern": "(\\d{4}-\\d{2}-\\d{2})",
+        "selector": {
+          "css": "div.time, span.time, .article-time",
+          "mode": "text"
+        },
+        "description": "农业农村部日期在 class 含 time 的 div 中"
+      }
     }
   ],
   "crawNumPerSource": 10,
   "maxConsecutiveNonToday": 10,
+  "llmBatchSize": 100,
+  "llmTimeout": 300,
+  "llmMaxRetries": 3,
   "listPageExtract": {
     "sourceName": "生意社",
     "itemSelector": "li",
@@ -57,8 +161,5 @@
     "linkSelector": "div.pr-news-tit a.blue",
     "linkUrlTemplate": "https://www.100ppi.com/kx/{href}",
     "titleProductOnly": true
-  },
-  "llmBatchSize": 100,
-  "llmTimeout": 300,
-  "llmMaxRetries": 3
+  }
 }

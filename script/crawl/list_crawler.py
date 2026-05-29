@@ -316,12 +316,16 @@ async def main():
                 pub_time = art.get("list_date") or art.get("publish_time") or ""
 
                 if not pub_time:
-                    local_no_date += 1
-                    if name not in no_date_sources:
-                        no_date_sources[name] = 0
-                    no_date_sources[name] += 1
-                    log(f"  -> {art['title'][:40]}... [SKIP] 无日期")
-                    # 无日期的也入库，但不采正文
+                    # 无日期：有无文章 URL？
+                    # 有 URL → 入库（is_useful=0），news_filter 判断是否有用，article_crawler 从文章页提取日期
+                    # 无 URL（如生意社列表页直采）→ 必须有日期，否则跳过
+                    if not art.get("url"):
+                        local_no_date += 1
+                        if name not in no_date_sources:
+                            no_date_sources[name] = 0
+                        no_date_sources[name] += 1
+                        log(f"  -> {art['title'][:40]}... [SKIP] 列表页直采无日期")
+                        continue
                     ok = db_insert({
                         "source_name": name,
                         "title": art["title"],
@@ -333,16 +337,16 @@ async def main():
                         "batch_id": current_batch_id,
                     }, commit=False, conn=conn)
                     if ok:
-                        if art["url"]:
-                            existing_urls.add(art["url"])
+                        existing_urls.add(art["url"])
                     conn.commit()
+                    log(f"  -> {art['title'][:40]}... [NO-DATE] 已入库，news_filter 判断")
                     continue
 
                 if not is_today(pub_time):
                     local_old += 1
                     total_skip_old += 1
                     consecutive_not_today += 1
-                    log(f"  -> {art['title'][:40]}... [SKIP] 非当天（连续 {consecutive_not_today}/{max_consec}）")
+                    log(f"  -> {art['title'][:40]}... [SKIP] 非当天 {pub_time}（连续 {consecutive_not_today}/{max_consec}）")
                     continue
 
                 consecutive_not_today = 0

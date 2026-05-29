@@ -243,23 +243,102 @@ def _extract_html_structured(html: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# 主入口：extract_date_from_html
-# 优先级：① COMBINED_DATE_REGEX 全文本扫描（无截断）→ ② 结构化 HTML 解析 → ③ URL 路径兜底
+# 辅助：加载 publishTimeExtract 配置
 # ---------------------------------------------------------------------------
 
-def extract_date_from_html(html: str, url: str = "") -> str | None:
+def get_publish_time_extract(source_name: str) -> dict | None:
+    """加载指定数据源的 publishTimeExtract 配置"""
+    import json as _json
+    from pathlib import Path as _Path
+    sources_path = _Path(__file__).parent.parent.parent / "config" / "sources.json"
+    if not sources_path.exists():
+        return None
+    try:
+        data = _json.loads(sources_path.read_text(encoding="utf-8"))
+        for source in data.get("sources", []):
+            if source.get("name") == source_name:
+                return source.get("publishTimeExtract")
+        return None
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------------------------
+# 策略：使用 source-specific 的 publishTimeExtract
+# ---------------------------------------------------------------------------
+
+def extract_date_by_pattern(html: str, publish_time_extract: dict | None) -> str | None:
+    """使用 source-specific 的 publishTimeExtract 提取日期"""
+    if not html or not publish_time_extract:
+        return None
+    import re as _re
+
+    # 策略1：主正则
+    pattern = publish_time_extract.get("pattern", "")
+    if pattern:
+        try:
+            m = _re.search(pattern, html, _re.DOTALL | _re.IGNORECASE)
+            if m:
+                try:
+                    g1 = m.group(1)
+                    date_str = g1.strip() if g1 else m.group(0).strip()
+                except (IndexError, AttributeError):
+                    date_str = m.group(0).strip() if m.group(0) else None
+                if date_str:
+                    t = parse_publish_time(date_str)
+                    if t:
+                        return t
+        except _re.error:
+            pass
+
+    # 策略2：fallbackPattern
+    fallback = publish_time_extract.get("fallbackPattern", "")
+    if fallback:
+        try:
+            m = _re.search(fallback, html, _re.DOTALL | _re.IGNORECASE)
+            if m:
+                try:
+                    g1 = m.group(1)
+                    date_str = g1.strip() if g1 else m.group(0).strip()
+                except (IndexError, AttributeError):
+                    date_str = m.group(0).strip() if m.group(0) else None
+                if date_str:
+                    t = parse_publish_time(date_str)
+                    if t:
+                        return t
+        except _re.error:
+            pass
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# 主入口：extract_date_from_html
+# 优先级：① source-specific publishTimeExtract → ② 结构化 HTML 解析 → ③ COMBINED_DATE_REGEX 扫描 → ④ URL 路径兜底
+# ---------------------------------------------------------------------------
+
+def extract_date_from_html(html: str, url: str = "", source_name: str = "") -> str | None:
     """
     从 HTML 中提取日期时间。
 
     优先级：
-      1. HTML 结构化解析（og:meta / article结构内日期 / site-specific）
-      2. COMBINED_DATE_REGEX 全文本扫描（无截断）
-      3. URL 路径兜底（最低优先）
+      1. source-specific publishTimeExtract（当提供 source_name 时）
+      2. HTML 结构化解析（og:meta / article结构内日期 / site-specific）
+      3. COMBINED_DATE_REGEX 全文本扫描（无截断）
+      4. URL 路径兜底（最低优先）
     """
     if not html:
         return None
 
-    # 策略1：HTML 结构化解析（最准确，避免抓取到页面其他无关日期）
+    # 策略0：source-specific publishTimeExtract（优先）
+    if source_name:
+        pte = get_publish_time_extract(source_name)
+        if pte:
+            t = extract_date_by_pattern(html, pte)
+            if t:
+                return t
+
+    # 策略1：HTML 结构化解析
     t = _extract_html_structured(html)
     if t:
         return t
