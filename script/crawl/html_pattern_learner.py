@@ -40,28 +40,17 @@ from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from llm import call_async_raw
 from common.util import parse_publish_time
+from common.log import log as _log
+
+
+def log(msg: str):
+    _log("html_pattern_learner", msg)
 
 
 # ==================== 配置路径 ====================
 
 BASE_DIR = Path(__file__).parent.parent.parent.resolve()
 SOURCES_PATH = BASE_DIR / "config" / "sources.json"
-LOG_DIR = BASE_DIR / "logs"
-LOG_DIR.mkdir(exist_ok=True)
-log_file = LOG_DIR / f"pattern_learn_{datetime.now().strftime('%Y%m%d')}.log"
-
-
-def log(msg: str):
-    """写入日志到文件和stdout（处理Windows GBK编码问题）"""
-    ts = datetime.now().strftime("%H:%M:%S")
-    line = f"[{ts}] {msg}"
-    try:
-        print(line, flush=True)
-    except UnicodeEncodeError:
-        # Windows控制台GBK编码不支持时，使用replace模式
-        print(line.encode('gbk', errors='replace').decode('gbk'), flush=True)
-    with open(log_file, "a", encoding="utf-8") as f:
-        f.write(line + "\n")
 
 
 # ==================== URL 过滤 ====================

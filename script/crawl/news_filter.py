@@ -23,22 +23,16 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from common.db import get_conn, init_db, get_unfiltered_batch, mark_useful, get_failed_batch
 from llm import call_async_raw
+from common.log import log as _log
 
 
 BASE_DIR = Path(__file__).parent.parent.parent.resolve()
 SOURCES_PATH = BASE_DIR / "config" / "sources.json"
 PROMPT_FILE = BASE_DIR / "prompt" / "新闻筛选.md"
-LOG_DIR = BASE_DIR / "logs"
-LOG_DIR.mkdir(exist_ok=True)
-log_file = LOG_DIR / f"news_filter_{datetime.now().strftime('%Y%m%d')}.log"
 
 
 def log(msg: str):
-    ts = datetime.now().strftime("%H:%M:%S")
-    line = f"[{ts}] {msg}"
-    print(line, flush=True)
-    with open(log_file, "a", encoding="utf-8") as f:
-        f.write(line + "\n")
+    _log("news_filter", msg)
 
 
 def load_prompt_template() -> str:

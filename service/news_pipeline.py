@@ -18,11 +18,10 @@ sys.path.insert(0, str(_BASE_DIR / "script"))
 sys.path.insert(0, str(_BASE_DIR))
 
 from common import init_all, init_db
-
+from common.log import log as _log
 
 def log(msg: str):
-    ts = datetime.now().strftime("%H:%M:%S")
-    print(f"[{ts}] {msg}", flush=True)
+    _log("news_pipeline", msg)
 
 
 def run_list_crawler():

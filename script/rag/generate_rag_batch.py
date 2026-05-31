@@ -23,16 +23,11 @@ sys.path.insert(0, str(_BASE_DIR / "script"))
 from llm import call_async_raw
 from llm.prompts import get_rag_prompt
 from rag.parser import save_to_db
+from common.log import log as _ulog
 
 
-def _log(msg: str):
-    from datetime import datetime
-    ts = datetime.now().strftime("%H:%M:%S")
-    try:
-        print(f"[{ts}] {msg}", flush=True)
-    except UnicodeEncodeError:
-        safe = msg.encode("gbk", errors="replace").decode("gbk")
-        print(f"[[{ts}] {safe}", flush=True)
+def log(msg: str):
+    _ulog("generate_rag_batch", msg)
 
 
 async def _generate_one(sector: str, semaphore: asyncio.Semaphore, save_report: bool) -> dict:
@@ -68,8 +63,8 @@ async def _run_batch(sectors: list[str], concurrency: int = 3, save_report: bool
     """并发执行所有板块，semaphore 控制并行数"""
     semaphore = asyncio.Semaphore(concurrency)
 
-    _log(f"启动批量生成，并发数={concurrency}，板块数={len(sectors)}")
-    _log("=" * 60)
+    log(f"启动批量生成，并发数={concurrency}，板块数={len(sectors)}")
+    log("=" * 60)
 
     tasks = [_generate_one(s, semaphore, save_report) for s in sectors]
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -95,29 +90,29 @@ def run(sectors: str, concurrency: int = 3, save_report: bool = False) -> list[d
     """
     sector_list = [s.strip() for s in sectors.split(",") if s.strip()]
     if not sector_list:
-        _log("未提供有效板块")
+        log("未提供有效板块")
         return []
 
-    _log(f"待处理板块: {sector_list}")
-    _log("=" * 60)
+    log(f"待处理板块: {sector_list}")
+    log("=" * 60)
 
     t0 = time.time()
     results = asyncio.run(_run_batch(sector_list, concurrency=concurrency, save_report=save_report))
     total_elapsed = time.time() - t0
 
-    _log("=" * 60)
-    _log(f"批量完成，共 {len(sector_list)} 个板块，耗时 {total_elapsed:.1f}s")
+    log("=" * 60)
+    log(f"批量完成，共 {len(sector_list)} 个板块，耗时 {total_elapsed:.1f}s")
 
     ok_list = [r for r in results if r.get("success")]
     fail_list = [r for r in results if not r.get("success")]
 
     for r in ok_list:
-        _log(f"  [OK]  {r['sector']}  ({r.get('elapsed', 0):.1f}s)")
+        log(f"  [OK]  {r['sector']}  ({r.get('elapsed', 0):.1f}s)")
 
     for r in fail_list:
-        _log(f"  [FAIL] {r['sector']}  {r.get('error', 'unknown error')}")
+        log(f"  [FAIL] {r['sector']}  {r.get('error', 'unknown error')}")
 
-    _log(f"成功 {len(ok_list)}/{len(sector_list)}")
+    log(f"成功 {len(ok_list)}/{len(sector_list)}")
     return results
 
 

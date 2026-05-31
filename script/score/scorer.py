@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 from script.common.db import get_unread, mark_scored, insert_importance
 from script.common.db.sectors import normalize
 from llm import call
+from common.log import log as _log
 
 
 # ---------------------------------------------------------------------------
@@ -44,11 +45,7 @@ LOG_FILE = LOG_DIR / f"scoring_{datetime.now().strftime('%Y%m%d')}.log"
 
 
 def log(msg: str):
-    ts = datetime.now().strftime("%H:%M:%S")
-    line = f"[{ts}] {msg}"
-    print(line, flush=True)
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(line + "\n")
+    _log("scorer", msg)
 
 
 # ---------------------------------------------------------------------------

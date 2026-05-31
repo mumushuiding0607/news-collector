@@ -20,27 +20,19 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from crawl.content.content_filter import clean_boilerplate_text
 from common.db import get_conn, init_db, get_all_urls, insert as db_insert, upsert_list_page_article
 from common.util import parse_publish_time, is_today
+from common.log import log as _log
+
+today = date.today()
+today_str = today.strftime("%Y-%m-%d")
+
+
+def log(msg: str):
+    _log("list_crawler", msg)
 
 
 BASE_DIR = Path(__file__).parent.parent.parent.resolve()
 DB_PATH = BASE_DIR / "db" / "primary.db"
 SOURCES_PATH = BASE_DIR / "config" / "sources.json"
-LOG_DIR = BASE_DIR / "logs"
-LOG_DIR.mkdir(exist_ok=True)
-today = date.today()
-today_str = today.strftime("%Y-%m-%d")
-log_file = LOG_DIR / f"list_crawl_{datetime.now().strftime('%Y%m%d')}.log"
-
-
-def log(msg: str):
-    ts = datetime.now().strftime("%H:%M:%S")
-    line = f"[{ts}] {msg}"
-    try:
-        print(line, flush=True)
-    except UnicodeEncodeError:
-        print(line.encode("utf-8", errors="replace").decode("utf-8", errors="replace"), flush=True)
-    with open(log_file, "a", encoding="utf-8") as f:
-        f.write(line + "\n")
 
 
 def is_article_url(url: str) -> bool:

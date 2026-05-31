@@ -33,6 +33,7 @@ try:
     from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
     from llm import call_async_raw
     from common.util import parse_publish_time
+    from common.log import log as _log
 except ImportError as e:
     print(f"导入失败: {e}")
     print("请确保已安装依赖: pip install crawl4ai beautifulsoup4 aiohttp")
@@ -41,21 +42,10 @@ except ImportError as e:
 # ==================== 配置路径 ====================
 CONFIG_DIR = BASE_DIR.parent / "config"  # script/config/ 的 parent 是 script，script 的 parent 是项目根目录
 SOURCES_PATH = CONFIG_DIR / "sources.json"
-LOG_DIR = BASE_DIR / "logs"
-LOG_DIR.mkdir(exist_ok=True)
-log_file = LOG_DIR / f"source_manager_{datetime.now().strftime('%Y%m%d')}.log"
 
 
 def log(msg: str):
-    """写入日志到文件和stdout"""
-    ts = datetime.now().strftime("%H:%M:%S")
-    line = f"[{ts}] {msg}"
-    try:
-        print(line, flush=True)
-    except UnicodeEncodeError:
-        print(line.encode('gbk', errors='replace').decode('gbk'), flush=True)
-    with open(log_file, "a", encoding="utf-8") as f:
-        f.write(line + "\n")
+    _log("source_manager", msg)
 
 
 # ==================== URL 过滤 ====================

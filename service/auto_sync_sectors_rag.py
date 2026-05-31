@@ -1,10 +1,13 @@
 """
-auto_sync_sectors_rag.py - 同步板块 RAG 内容
+auto_sync_sectors_rag.py - 全量同步板块核心标的 RAG 报告
 
 功能：
-  - 从同花顺获取所有板块列表
-  - 调用 LLM 根据核心标的.md 提示词分析每个板块的核心标的
-  - 保存到 rag_sectors、rag_stocks 表
+  - 从 db.sectors 查询所有板块，每3个一组串联调用 generate_rag_batch 生成核心标的
+  - 每批内部 LLM 并发处理3个板块，批与批之间完全串行
+
+日志：
+  - 控制台 + 文件 双输出
+  - 日志文件：logs/auto_sync_sectors_rag_YYYYMMDD_HHMMSS.log
 
 使用：
   python service/auto_sync_sectors_rag.py
@@ -13,145 +16,84 @@ auto_sync_sectors_rag.py - 同步板块 RAG 内容
 import sys
 from pathlib import Path
 from datetime import datetime
-import json
 
 _BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_BASE_DIR / "script"))
 sys.path.insert(0, str(_BASE_DIR))
 
-from common.db.rag import save_all
-from api_clients.iwencai import query_wencai
-from llm import call
-
-
-PROMPT_TEMPLATE = """# 核心标的筛选提示词（精简执行版）
-
-## 角色与目标
-你是一位资深产业分析师。请针对【目标板块】系统性筛选核心标的。
-
-## 第一步：全产业链拆解
-检查以下环节是否存在：
-- 上游资源/原材料
-- 中游制造/核心元器件
-- 下游封测/应用
-
-## 第二步：四维度评估
-对相关A股标的评估：
-1. 竞争格局（高/中/低）
-2. 盈利质量（高/中/低）
-3. 客户壁垒（高/中/低）
-4. 技术迭代（高/中/低）
-
-## 第三步：严格剔除
-- 官方声明无实质业务
-- 间接参股无实际往来
-- 关联收入<10%
-- 仅送样无量产
-
-## 输出格式（严格JSON）
-
-板块名称：{sector_name}
-
-返回：
-{{
-  "sector": {{
-    "chain_coverage": {{
-      "上游": "已覆盖/无此环节",
-      "中游": "已覆盖/无此环节",
-      "下游": "已覆盖/无此环节"
-    }}
-  }},
-  "stocks": [
-    {{
-      "code": "代码",
-      "name": "名称",
-      "tier": "梯队",
-      "chain_link": "环节",
-      "four_dims": {{"竞":"高/中/低","盈":"高/中/低","客":"高/中/低","技":"高/中/低"}},
-      "moat": "护城河",
-      "q1_metrics": "Q1业绩",
-      "include_path": "A/B/C"
-    }}
-  ],
-  "eliminated": [
-    {{"code":"代码","name":"名称","reason":"原因","rule_no":"规则"}}
-  ]
-}}
-"""
+from common.db.connection import get_conn
+from common.log import log as _log
 
 
 def log(msg: str):
-    ts = datetime.now().strftime("%H:%M:%S")
-    print(f"[{ts}] {msg}", flush=True)
+    _log("auto_sync_sectors_rag", msg)
 
 
-def get_all_sectors_from_wencai() -> list[dict]:
-    """从同花顺获取所有板块"""
-    result = query_wencai("二级概念板块或二级行业板块", secondary_intent="zhishu", page=1, perpage=100, loop=5)
-    if result["status"] != "success":
-        log(f"获取板块失败: {result.get('message')}")
-        return []
-    return result.get("data", [])
-
-
-def analyze_sector(sector_name: str) -> dict | None:
-    """调用 LLM 分析板块核心标的"""
-    prompt = PROMPT_TEMPLATE.format(sector_name=sector_name)
+def get_all_sectors() -> list[str]:
+    """从数据库查询所有板块名称（归约到 db 层）"""
+    conn = get_conn()
     try:
-        result = call([{"role": "user", "content": prompt}])
-        if not result:
-            return None
-        import re
-        m = re.search(r'\{[\s\S]*\}', result)
-        if m:
-            return json.loads(m.group())
-    except Exception as e:
-        log(f"  LLM 失败: {e}")
-    return None
+        rows = conn.execute(
+            "SELECT DISTINCT name FROM sectors ORDER BY name"
+        ).fetchall()
+        return [r[0] for r in rows if r[0]]
+    finally:
+        conn.close()
 
 
-def sync_sector(sector_name: str) -> bool:
-    """同步单个板块 RAG"""
-    log(f"分析: {sector_name}")
-    parsed = analyze_sector(sector_name)
-    if not parsed:
-        log(f"  -> 跳过")
-        return False
-    try:
-        save_all(sector_name, json.dumps(parsed, ensure_ascii=False), parsed)
-        stocks = len(parsed.get("stocks", []))
-        elim = len(parsed.get("eliminated", []))
-        log(f"  -> OK: {stocks} 标的, {elim} 剔除")
-        return True
-    except Exception as e:
-        log(f"  -> 保存失败: {e}")
-        return False
+def chunk_list(lst: list, size: int) -> list[list]:
+    """把列表切成每组 size 个"""
+    return [lst[i:i + size] for i in range(0, len(lst), size)]
 
 
 def run():
+    """
+    主流程：
+    1. 查询所有板块
+    2. 每3个一组，串联调用 generate_rag_batch.run()
+       - 每批内部 concurrency=3，LLM 并发处理3个板块
+       - 批与批之间完全串行
+    """
     log("=" * 60)
-    log("同步板块 RAG 内容")
+    log("开始全量同步板块核心标的 RAG")
     log("=" * 60)
 
-    log("获取板块列表...")
-    sectors = get_all_sectors_from_wencai()
-    log(f"共 {len(sectors)} 个板块")
-
+    sectors = get_all_sectors()
     if not sectors:
-        log("无可用板块")
+        log("未找到任何板块，退出")
         return
 
-    ok, fail = 0, 0
-    for i, s in enumerate(sectors, 1):
-        name = s.get("name", "")
-        if not name:
-            continue
-        log(f"\n[{i}/{len(sectors)}]")
-        if sync_sector(name):
-            ok += 1
-        else:
-            fail += 1
+    log(f"共找到 {len(sectors)} 个板块")
 
-    log(f"\n完成: 成功 {ok}, 失败 {fail}")
+    batches = chunk_list(sectors, 3)
+    log(f"分为 {len(batches)} 批，每批3个板块并行，批间完全串行")
+
+    total_ok = 0
+    total_fail = 0
+
+    for i, batch in enumerate(batches, 1):
+        batch_str = ",".join(batch)
+        log(f"\n--- 批次 {i}/{len(batches)}: {batch_str} ---")
+
+        # 串联调用，禁止并发
+        from script.rag.generate_rag_batch import run as generate_run
+        results = generate_run(sectors=batch_str, concurrency=3, save_report=False)
+
+        ok = sum(1 for r in results if r.get("success"))
+        fail = len(results) - ok
+        total_ok += ok
+        total_fail += fail
+
+        for r in results:
+            status = "OK" if r.get("success") else f"FAIL({r.get('error', 'unknown')})"
+            elapsed = r.get("elapsed", 0)
+            log(f"  [{status}] {r.get('sector')} ({elapsed:.1f}s)")
+
+        log(f"批次 {i} 完成: {ok} 成功, {fail} 失败")
+
+    log("\n" + "=" * 60)
+    log(f"全部完成: {total_ok} 成功, {total_fail} 失败")
+    log("=" * 60)
 
 
 if __name__ == "__main__":

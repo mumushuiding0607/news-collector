@@ -32,7 +32,6 @@ from .config import (
     DB_PATH, CACHE_DIR,
     get_sources_config, get_source_config,
 )
-from .log import setup_logger, get_logger, timestamp_print
 
 # ==================== 路径配置 ====================
 

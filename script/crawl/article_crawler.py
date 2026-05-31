@@ -19,23 +19,17 @@ from common.db import get_conn, init_db, get_useful_uncrawled
 from common.db import primary_source as db_ps
 from common.util import extract_date_from_html, is_today
 from script.crawl.js_render_fixes import build_js_run_cfg
+from common.log import log as _log
 
 
 BASE_DIR = Path(__file__).parent.parent.parent.resolve()
 SOURCES_PATH = BASE_DIR / "config" / "sources.json"
-LOG_DIR = BASE_DIR / "logs"
-LOG_DIR.mkdir(exist_ok=True)
 today = date.today()
 today_str = today.strftime("%Y-%m-%d")
-log_file = LOG_DIR / f"article_crawl_{datetime.now().strftime('%Y%m%d')}.log"
 
 
 def log(msg: str):
-    ts = datetime.now().strftime("%H:%M:%S")
-    line = f"[{ts}] {msg}"
-    print(line, flush=True)
-    with open(log_file, "a", encoding="utf-8") as f:
-        f.write(line + "\n")
+    _log("article_crawler", msg)
 
 
 def _get_content_extract_pattern(source_name: str) -> str | None:

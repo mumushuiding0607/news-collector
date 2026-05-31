@@ -58,26 +58,37 @@ def extract_stocks_from_table(table_text: str) -> list[dict]:
             continue
 
         # 跳过表头和分隔行
-        tier = parts[1].strip() if len(parts) > 1 else ''
+        tier_raw = parts[1].strip()
+        tier = tier_raw.replace('*', '')
         if '---' in line or tier in ['梯队', ''] or not tier:
             continue
 
-        # 只接受有效的梯队行
-        if tier not in ['第一梯队', '第二梯队', '第三梯队A类', '第三梯队B类']:
+        # 只接受有效的梯队行（允许 LLM 输出简写，如"第三梯队A"而非"第三梯队A类"）
+        tier_variants = {
+            '第一梯队', '第二梯队',
+            '第三梯队A类', '第三梯队A', '第三梯队B类', '第三梯队B',
+        }
+        if tier not in tier_variants:
             continue
 
         try:
+            # parts[3] 可能是 "-"（无代码），名称不含 * 但可能含 **bold**
+            raw_code = parts[3].strip()
+            code = raw_code.replace('*', '') if raw_code not in ('-', '**-**') else ''
+
             stock = {
                 'tier': tier,
                 'sort': parts[2].strip(),
-                'code': parts[3].strip(),
-                'name': parts[4].strip(),
+                'code': code,
+                'name': parts[4].strip().replace('*', ''),
                 'chain_link': parts[5].strip(),
                 'four_dims': parse_four_dims(parts[6].strip()) if len(parts) > 6 else {},
                 'moat': parts[7].strip() if len(parts) > 7 else '',
                 'q1_metrics': parts[8].strip() if len(parts) > 8 else '',
                 'include_path': parts[9].strip() if len(parts) > 9 else '',
             }
+            if not stock['name']:
+                continue
             stocks.append(stock)
             logger.debug(f"解析标的: {tier} {stock['code']} {stock['name']}")
         except (IndexError, ValueError) as e:
@@ -110,8 +121,8 @@ def extract_eliminated_from_text(text: str) -> list[dict]:
             continue
 
         if in_table:
-            if '附录二' in line or '---' in line:
-                logger.debug(f"退出附录一区域: {line[:30]}")
+            # 遇到分隔行（:---|）或附录二标识则退出
+            if '---' in line or '附录二' in line:
                 break
             if '|' not in line:
                 continue
@@ -120,10 +131,14 @@ def extract_eliminated_from_text(text: str) -> list[dict]:
             if len(parts) < 4:
                 continue
 
+            # 跳过表头行
+            if parts[1].strip() in ('名称', '代码', ''):
+                continue
+
             try:
                 elim = {
-                    'code': parts[1].strip(),
-                    'name': parts[2].strip(),
+                    'code': parts[1].strip().replace('*', ''),
+                    'name': parts[2].strip().replace('*', ''),
                     'reason': parts[3].strip(),
                     'rule_no': parts[4].strip() if len(parts) > 4 else '',
                 }
