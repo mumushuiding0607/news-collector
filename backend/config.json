@@ -1,0 +1,32 @@
+{
+  "app_name": "风向标",
+  "app_subtitle": "热点早知道",
+  "sms_login_enabled": true,
+  "password_login_enabled": true,
+  "subscription_tiers": [
+    {
+      "level": "free",
+      "name": "免费版",
+      "price": 0,
+      "duration_days": 0,
+      "description": "每日免费新闻浏览",
+      "features": ["每日10条新闻", "基础板块涨跌", "热门列表浏览"]
+    },
+    {
+      "level": "pro",
+      "name": "专业版",
+      "price": 10,
+      "duration_days": 30,
+      "description": "解锁全部热点内容",
+      "features": ["无限新闻", "完整板块数据", "核心标的详情", "热点推送"]
+    },
+    {
+      "level": "premium",
+      "name": "高级版",
+      "price": 299,
+      "duration_days": 90,
+      "description": "最高权限，机构级决策支持",
+      "features": ["Pro全部功能", "深度分析", "机构级决策", "专属顾问", "定制关注"]
+    }
+  ]
+}

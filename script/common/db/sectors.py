@@ -54,6 +54,7 @@ except ImportError:
 
     def to_pinyin_full(text: str) -> str:
         return ""
+    print("[警告] pypinyin 未安装，拼音匹配功能不可用。请运行: pip install pypinyin")
 
 
 # ==================== 数据库连接 ====================
@@ -158,16 +159,15 @@ def search(keyword: str, limit: int = 5) -> list[dict]:
             for row in rows:
                 results.append({"code": row[0], "name": row[1], "match_type": "pinyin_initial"})
 
-        # 3. FTS5全文搜索
+        # 3. LIKE模糊匹配（替代FTS5，因FTS5中文有问题）
         if len(results) < limit:
-            fts_rows = conn.execute("""
-                SELECT s.code, s.name FROM sectors s
-                JOIN sectors_fts f ON s.id = f.rowid
-                WHERE sectors_fts MATCH ?
+            like_rows = conn.execute("""
+                SELECT code, name FROM sectors
+                WHERE name LIKE ?
                 LIMIT ?
-            """, (f"{keyword}*", limit - len(results))).fetchall()
-            for row in fts_rows:
-                results.append({"code": row[0], "name": row[1], "match_type": "fts"})
+            """, (f"%{keyword}%", limit - len(results))).fetchall()
+            for row in like_rows:
+                results.append({"code": row[0], "name": row[1], "match_type": "like"})
 
         # 4. keywords模糊匹配
         if len(results) < limit:
@@ -189,17 +189,62 @@ def fuzzy_match(raw_name: str) -> dict | None:
         return None
     raw = raw_name.strip()
 
-    # 精确匹配
+    # 1. 精确匹配（名称完全一致）
     results = search(raw, limit=1)
     if results and results[0]["match_type"] == "exact":
         return results[0]
 
-    # 模糊匹配
+    # 2. 拼音首字母匹配（支持拼音输入）
+    pinyin_initial = to_pinyin_initial(raw)
+    if pinyin_initial and len(pinyin_initial) >= 2:
+        results = search(pinyin_initial, limit=3)
+        if results:
+            return results[0]
+
+    # 3. keywords 匹配（别名映射）
+    results = search(raw, limit=5)
+    for r in results:
+        if r["match_type"] == "keyword":
+            return r
+
+    # 4. 模糊匹配（包含匹配）
     results = search(raw, limit=3)
     if results:
         best = results[0]
-        if best["match_type"] in ("pinyin_initial", "fts", "keyword", "exact"):
+        if best["match_type"] in ("pinyin_initial", "like", "keyword", "exact"):
             return best
+
+    # 5. 移除常见后缀词后匹配（电力设备 -> 电力）
+    for suffix in ['行业', '板块', '概念', '设备', '生产', '制造', '相关', '主题']:
+        if raw.endswith(suffix):
+            core = raw[:-len(suffix)]
+            if core and len(core) >= 2:
+                results = search(core, limit=3)
+                if results:
+                    return results[0]
+
+    # 6. 提取核心词匹配（尝试不同长度的前缀）
+    for core_len in [2, 3, 4]:
+        if len(raw) >= core_len:
+            core = raw[:core_len]
+            if core != raw:
+                results = search(core, limit=3)
+                if results:
+                    best = results[0]
+                    if best["match_type"] in ("pinyin_initial", "like", "keyword", "exact"):
+                        return best
+
+    # 7. 尝试截取后缀（取最后2-4个字符）
+    for suffix_len in [2, 3, 4]:
+        if len(raw) >= suffix_len:
+            suffix = raw[-suffix_len:]
+            if suffix != raw:
+                results = search(suffix, limit=3)
+                if results:
+                    best = results[0]
+                    if best["match_type"] in ("like", "exact"):
+                        return best
+
     return None
 
 

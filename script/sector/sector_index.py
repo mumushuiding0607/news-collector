@@ -15,8 +15,9 @@ import re
 from datetime import datetime, timedelta
 from typing import Optional
 
-from common.iwencai import query_wencai
+from api_clients.iwencai import query_wencai
 from common.db.sectors import normalize
+from common.db import sector_indices as db_sector_indices
 
 
 # ==================== 板块指数查询 ====================
@@ -108,87 +109,18 @@ def query_sectors_at_time(sector_names: list[str], news_time: str, top_n: int = 
 # ==================== 关联板块指数存储 ====================
 
 def save_sector_indices(importance_id: int, sector_data: list[dict], commit: bool = True):
-    """
-    将板块指数数据存入数据库
-
-    Args:
-        importance_id: importance表记录ID
-        sector_data: 板块指数列表
-        commit: 是否立即提交
-    """
-    from common.db.connection import get_conn
-
-    conn = get_conn()
-    try:
-        for sector in sector_data:
-            conn.execute("""
-                INSERT OR REPLACE INTO sector_indices
-                    (importance_id, sector_code, sector_name, change_rate, volume, amount, dde_net_amount, query_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'))
-            """, (
-                importance_id,
-                sector.get("code", ""),
-                sector.get("name", ""),
-                sector.get("change_rate", ""),
-                sector.get("volume", ""),
-                sector.get("amount", ""),
-                sector.get("dde_net_amount", ""),
-            ))
-        if commit:
-            conn.commit()
-    finally:
-        conn.close()
+    """将板块指数数据存入数据库（使用 db.sector_indices 层）"""
+    db_sector_indices.save_sector_indices(importance_id, sector_data, commit)
 
 
 def get_sector_indices(importance_id: int) -> list[dict]:
-    """读取某条新闻的关联板块指数"""
-    from common.db.connection import get_conn
-
-    conn = get_conn()
-    cur = conn.execute("""
-        SELECT sector_code, sector_name, change_rate, volume, amount, dde_net_amount, query_time
-        FROM sector_indices
-        WHERE importance_id = ?
-        ORDER BY query_time DESC
-    """, (importance_id,))
-    rows = cur.fetchall()
-    conn.close()
-
-    return [
-        {
-            "sector_code": row[0],
-            "sector_name": row[1],
-            "change_rate": row[2],
-            "volume": row[3],
-            "amount": row[4],
-            "dde_net_amount": row[5],
-            "query_time": row[6],
-        }
-        for row in rows
-    ]
+    """读取某条新闻的关联板块指数（使用 db.sector_indices 层）"""
+    return db_sector_indices.get_sector_indices(importance_id)
 
 
 def ensure_sector_indices_table():
-    """确保sector_indices表存在"""
-    from common.db.connection import get_conn
-
-    conn = get_conn()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS sector_indices (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            importance_id INTEGER NOT NULL,
-            sector_code TEXT,
-            sector_name TEXT,
-            change_rate TEXT,
-            volume TEXT,
-            amount TEXT,
-            dde_net_amount TEXT,
-            query_time TEXT DEFAULT (datetime('now','localtime')),
-            FOREIGN KEY (importance_id) REFERENCES importance(id)
-        )
-    """)
-    conn.commit()
-    conn.close()
+    """确保sector_indices表存在（由 schema.sql 统一管理，此函数已废弃）"""
+    pass
 
 
 # ==================== CLI入口 ====================

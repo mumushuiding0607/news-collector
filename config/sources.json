@@ -140,9 +140,24 @@
         },
         "description": "农业农村部日期在 class 含 time 的 div 中"
       }
+    },
+    {
+      "name": "TrendForce",
+      "is_flash": false,
+      "url": "https://www.trendforce.com/news/",
+      "contentExtract": "<article[^>]*>(.*?)</article>|<div[^>]*(?:class|id)=[\"'](?:[^'\"]*)?(?:post|article|entry|content)[^'\"]*[\"'][^>]*>([\\s\\S]*?)<\\/div>(?=\\s*<(?:nav|footer|aside|article)|\\s*$)",
+      "publishTimeExtract": {
+        "pattern": "<time[^>]+datetime=\"(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}[^\"]*)\"[^>]*>",
+        "fallbackPattern": "(?:datetime=[\"']([0-9]{4}[-/][0-9]{2}[-/][0-9]{2}(?:[T\\s][0-9]{2}:[0-9]{2}:[0-9]{2})?))|(?:20[0-9]{2}[-/][0-9]{2}[-/][0-9]{2})",
+        "selector": {
+          "css": "article time[datetime], .post-time, .publish-date, span.date, time",
+          "mode": "attribute:datetime"
+        },
+        "description": "主正则优先匹配<time>标签的ISO 8601格式datetime属性（如2026-05-29T10:30:00），这是WordPress标准输出格式。若无datetime属性则捕获span/div中包含date/time/publish关键词的文本。fallbackPattern使用宽松的YYYY-MM-DD或YYYY/MM/DD格式匹配。selector配置了CSS选择器列表，先尝试time[datetime]获取结构化数据，mode设为attribute:datetime确保优先提取标准时间属性而非文本。"
+      }
     }
   ],
-  "crawNumPerSource": 20,
+  "crawNumPerSource": 30,
   "maxConsecutiveNonToday": 10,
   "llmBatchSize": 50,
   "llmTimeout": 300,

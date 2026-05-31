@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from common.content_filter import clean_boilerplate_text
+from crawl.content.content_filter import clean_boilerplate_text
 from common.db import get_conn, init_db, get_all_urls, insert as db_insert, upsert_list_page_article
 from common.util import parse_publish_time, is_today
 
@@ -35,7 +35,10 @@ log_file = LOG_DIR / f"list_crawl_{datetime.now().strftime('%Y%m%d')}.log"
 def log(msg: str):
     ts = datetime.now().strftime("%H:%M:%S")
     line = f"[{ts}] {msg}"
-    print(line, flush=True)
+    try:
+        print(line, flush=True)
+    except UnicodeEncodeError:
+        print(line.encode("utf-8", errors="replace").decode("utf-8", errors="replace"), flush=True)
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(line + "\n")
 
@@ -44,14 +47,23 @@ def is_article_url(url: str) -> bool:
     """排除列表页、分类页等非文章 URL"""
     if url.lower().endswith('.gif'):
         return False
-    if any(k in url.lower() for k in ['/node/', '/category/', '/topic/', '/channel/', '/list/', '/index', '/page']):
+    # 排除搜索结果页、分类列表页
+    if '?s=' in url or '/category/' in url or '/topic/' in url or '/channel/' in url:
         return False
-    digit_segs = re.findall(r'/(\d+)', url)
-    if not digit_segs:
-        digit_segs = re.findall(r'[-.](\d+)[-.]', url)
-    if len(digit_segs) >= 1 and any(ext in url for ext in ['.htm', '.html']):
+    if any(k in url.lower() for k in ['/node/', '/list/', '/index']):
+        return False
+    # /news/ 后面必须跟日期 slug（/2026/05/29/）或具体文章路径才算文章
+    # 单纯的 /news/ 或 /news/page/N 是列表页
+    news_match = re.search(r'/news(/|$|\?)', url)
+    if news_match:
+        # /news/ 后面必须是 YYYY/MM/DD/ 才算文章
+        has_date_slug = bool(re.search(r'/news/\d{4}/\d{2}/\d{2}/', url))
+        has_article_path = bool(re.search(r'/news/\d{4}/\d{2}/\d{2}/[^/]+', url))
+        if not has_date_slug and not has_article_path:
+            return False
         return True
-    if any(p in url.lower() for p in ['/article/', '/news/', '/info/', '/detail/', '/show/']):
+    # 其他域名下的 /article/、/news/ 等
+    if any(p in url.lower() for p in ['/article/', '/info/', '/detail/', '/show/']):
         return True
     return False
 
@@ -92,49 +104,97 @@ def extract_article_links_with_dates(markdown: str, source_name: str) -> list[di
             i += 1
             continue
 
+        # 检测链接文本是否为导航/无关文字，需要从后续行找真正标题
+        nav_titles = {
+            'view more', 'first page', 'previous page', 'next page', 'last page',
+            'read more', 'view all', 'home', 'sign in', 'logout', 'member center',
+            'trendforce', 'news logo', 'news',
+        }
+        is_nav = title.lower() in nav_titles or title.lower().startswith('![')
+
+        article_title = title
+        subtitle_candidate = None
+
+        if is_nav:
+            # 在后续行找真正的文章标题（## 开头或 ** 包裹）
+            for look in range(1, 8):
+                if i + look >= len(lines):
+                    break
+                cand = lines[i + look].strip()
+                if cand.startswith('![') or cand.startswith('[ ') or not cand:
+                    continue
+                # 匹配 ** 包裹的标题，** 可能嵌套在 [News] 等前缀外
+                m2 = re.search(r'\*\*(.+?)\*\*', cand)
+                if m2:
+                    candidate = m2.group(1).strip()
+                    # 去掉 [News] 等前缀标记
+                    candidate = re.sub(r'^\s*\[News\]\s*', '', candidate, flags=re.IGNORECASE)
+                    if len(candidate) > 5:
+                        article_title = candidate
+                        subtitle_candidate = cand
+                        break
+                elif cand.startswith('## ') or cand.startswith('# '):
+                    candidate = re.sub(r'^#+\s*', '', cand)
+                    candidate = re.sub(r'^\*\*(.+?)\*\*$', r'\1', candidate).strip()
+                    candidate = re.sub(r'^\s*\[News\]\s*', '', candidate, flags=re.IGNORECASE)
+                    if len(candidate) > 5:
+                        article_title = candidate
+                        subtitle_candidate = cand
+                        break
+
+        # 提取日期：优先从 URL slug（/YYYY/MM/DD/），次之从标题/后续行
         date_str = None
-        found = parse_publish_time(title)
-        if found:
-            date_str = found
-            title = re.sub(r'\s*\d{4}[-/.]\d{1,2}[-/.]\d{1,2}\s*$', '', title).rstrip()
-        title = title.strip().strip('[').strip(']').strip()
+        slug_match = re.search(r'/(\d{4}/\d{2}/\d{2})/', url)
+        if slug_match:
+            date_str = slug_match.group(1).replace('/', '-')
+
         if not date_str:
-            after_link = line[m.end():].strip()
-            if after_link:
-                found = parse_publish_time(after_link)
-                if found:
-                    date_str = found
+            found = parse_publish_time(article_title)
+            if found:
+                date_str = found
+                article_title = re.sub(r'\s*\d{4}[-/.]\d{1,2}[-/.]\d{1,2}\s*$', '', article_title).rstrip()
+
+        if not date_str and subtitle_candidate:
+            found = parse_publish_time(subtitle_candidate)
+            if found:
+                date_str = found
+
         if not date_str:
             for look in range(1, 4):
                 if i + look >= len(lines):
                     break
                 cand = lines[i + look].strip()
-                if re.search(r'\[.+\]\(https?://', cand):
+                if cand.startswith('![') or re.search(r'\[.+\]\(https?://', cand):
                     continue
                 found = parse_publish_time(cand)
                 if found:
                     date_str = found
                     break
 
-        after_link = line[m.end():].strip()
-        after_link = clean_markdown_text(after_link)
-        subtitle = after_link[:300] if after_link else ""
-        if not subtitle:
-            para_lines = []
-            for j in range(1, 3):
-                if i + j >= len(lines):
+        # 提取摘要
+        subtitle = ""
+        if is_nav and subtitle_candidate:
+            # 标题在 i+look 位置，摘要从 i+look+1 开始往后找内容段落
+            for j in range(i + look + 1, i + look + 8):
+                if j >= len(lines):
                     break
-                nxt = lines[i + j].strip()
-                if not nxt or nxt.startswith('![') or re.search(r'\]\(', nxt):
-                    break
+                nxt = lines[j].strip()
+                if not nxt or nxt.startswith('![') or nxt.startswith('[') or nxt.startswith('#'):
+                    continue
                 nxt = clean_markdown_text(nxt)
-                if nxt:
-                    para_lines.append(nxt)
-            if para_lines:
-                subtitle = para_lines[0][:300]
+                if nxt and len(nxt) > 10:
+                    subtitle = nxt[:300]
+                    break
+
+        # 导航链接且没找到真正标题则跳过
+        if is_nav and not subtitle_candidate:
+            i += 1
+            continue
+
+        article_title = article_title.strip().strip('[').strip(']').strip()
         articles.append({
             "source_name": source_name,
-            "title": title,
+            "title": article_title,
             "url": url,
             "subtitle": subtitle,
             "list_date": date_str,
@@ -233,6 +293,8 @@ async def main():
     log(f"Sources loaded: {len(sources)}, crawNumPerSource={global_limit}, maxConsecutiveNonToday={global_max_consecutive}")
 
     init_db()
+
+    from common.db.connection import get_conn
     conn = get_conn()
 
     # 为本次运行生成批次号

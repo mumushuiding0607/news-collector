@@ -2,6 +2,33 @@
 
 无人值守的一手新闻全量采集管道
 
+## ⚠️ 代码规范（必须遵守）
+
+### 代码生成
+- **必须按照 `BEST_PRACTICE.md` 中的最佳实践生成代码**
+- 涉及 Flutter/Dart 代码时，必须遵守 `docs/flutter-design.md` 和 `docs/flutter-ai-guide.md` 中的规范
+
+### Python 依赖管理
+- **新增 Python 模块必须在 `requirements.txt` 中登记**
+- 禁止在代码中硬编码未在 `requirements.txt` 中声明的依赖
+- 安装新依赖后，执行 `pip freeze > requirements.txt` 或手动添加
+
+```bash
+# 正确做法
+# 1. 安装新模块
+pip install some-package
+
+# 2. 立即登记到 requirements.txt
+pip freeze > requirements.txt
+# 或手动添加
+echo "some-package==x.x.x" >> requirements.txt
+```
+
+### 文件生成位置
+- **所有 log 文件必须在 `logs/` 目录中生成**
+- **所有 test 文件必须在各模块的 `test/` 目录或项目根目录 `test/` 目录中生成**
+- 禁止在业务代码目录中直接创建 log 或 test 文件
+
 ## 目录结构
 
 ```
@@ -33,15 +60,25 @@
 
 ## 快速开始
 
-### 1. 初始化数据库（首次部署）
+### 1. 安装依赖
 ```bash
-python init_db.py
+# Windows
+init.bat
+
+# Linux/Mac
+bash init.sh
 ```
 
 这将：
-- 执行 schema.sql 创建所有表（primary_sources, importance, sectors, sector_indices 等）
-- 验证 FTS5 虚拟表是否正常
-- 从同花顺同步 480 条板块数据
+- 安装所有 Python 依赖（crawl4ai, fastapi, pypinyin 等）
+- 安装 Flutter 依赖（如果 Flutter 已安装）
+- 执行 init_db.py 初始化数据库
+
+或手动安装：
+```bash
+pip install -r requirements.txt
+python init_db.py
+```
 
 ### 2. 运行采集
 ```bash
@@ -123,6 +160,36 @@ python script/read_news.py
 ```
 - 调用LLM生成摘要、关联板块、评分
 - 存入 importance 表
+
+## Step 5: 板块指数查询
+
+### 目标
+- `importance.publish_sector_values` - 首次填充（关联板块为空时）
+- `importance.current_sector_values` - 更新（高分 + 最近7天）
+
+### 数据格式
+```
+板块名:指数值|板块名:指数值
+示例：稀土永磁:1200.5|芯片概念:850.3|军工:2300.8
+```
+
+### 更新条件
+| 字段 | 条件 |
+|------|------|
+| publish_sector_values | `related_sectors` 不为空 AND 字段为空 |
+| current_sector_values | `related_sectors` 不为空 AND `importance_score` >= 7 AND `created_at` 在最近 7 天内 |
+
+**注意**：当一条记录同时满足两个条件时，一次填充两个字段
+
+### 方案（一次查询 + 批量匹配）
+1. 调用同花顺接口，问句 `二级行业或二级概念板块`，一次查询所有板块当前指数值（loop=5 获取全量 480 条）
+2. 构建 `{板块code: 指数值}` 和 `{板块名: 指数值}` 字典
+3. 遍历 importance 记录，根据 `related_sectors` 匹配，批量填充/更新
+
+### 实现脚本
+```bash
+python script/sector/sync_sector_values.py
+```
 
 ## 数据库表
 

@@ -14,8 +14,9 @@ from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from common.content_filter import get_content_filter, extract_clean_content
+from crawl.content.content_filter import get_content_filter, extract_clean_content
 from common.db import get_conn, init_db, get_useful_uncrawled
+from common.db import primary_source as db_ps
 from common.util import extract_date_from_html, is_today
 from script.crawl.js_render_fixes import build_js_run_cfg
 
@@ -170,14 +171,12 @@ async def main():
     log(f"Target date: {today_str}（仅采集当天新闻）")
 
     init_db()
-    conn = get_conn()
 
-    rows = get_useful_uncrawled(conn=conn)
+    rows = get_useful_uncrawled()
     log(f"待采集文章: {len(rows)} 条")
 
     if not rows:
         log("没有待采集的文章，退出。")
-        conn.close()
         return
 
     total_ok = 0
@@ -203,20 +202,17 @@ async def main():
             if ret == 'not_today':
                 total_skip_old += 1
                 log(f"  [SKIP] 非当天，删除记录")
-                conn.execute("DELETE FROM primary_sources WHERE id=?", (news_id,))
-                conn.commit()
+                db_ps.delete_by_id(news_id)
                 continue
             elif ret == 'no_date':
                 total_skip_no_date += 1
                 log(f"  [SKIP] 无法确认日期")
-                conn.execute("DELETE FROM primary_sources WHERE id=?", (news_id,))
-                conn.commit()
+                db_ps.delete_by_id(news_id)
                 continue
             elif ret == 'content_too_short':
                 total_skip_short += 1
                 log(f"  [SKIP] 正文过短")
-                conn.execute("DELETE FROM primary_sources WHERE id=?", (news_id,))
-                conn.commit()
+                db_ps.delete_by_id(news_id)
                 continue
             elif ret == 'crawl_failed':
                 total_skip_crawl_failed += 1
@@ -228,12 +224,7 @@ async def main():
                 continue
 
             fetched = ret
-            conn.execute("""
-                UPDATE primary_sources
-                SET content=?, content_length=?, publish_time=?, content_fetched_at=datetime('now','localtime'), status='read'
-                WHERE id=?
-            """, (fetched["content"], fetched["content_length"], fetched["publish_time"], news_id))
-            conn.commit()
+            db_ps.update_content(news_id, fetched["content"], fetched["content_length"], fetched["publish_time"])
             total_ok += 1
             log(f"  [OK] {fetched['publish_time']} ({len(fetched['content'])}字)")
             await asyncio.sleep(0.5)
@@ -245,8 +236,6 @@ async def main():
     log(f"无法确认日期: {total_skip_no_date}")
     log(f"正文过短: {total_skip_short}")
     log(f"抓取失败: {total_skip_crawl_failed}")
-
-    conn.close()
 
 
 if __name__ == "__main__":

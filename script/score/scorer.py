@@ -1,6 +1,10 @@
 """
 read_news.py - 新闻评分模块
 
+优化备注（2026-05-30）：
+  - LLM调用必须串行，禁止并发批量（token有限、速度有限、批量易失败）
+  - scorer.py 不需要改并发逻辑，保持现状
+
 读取 primary_sources 中 status='new' 的新闻，
 用 LLM 判断是否会引起交易市场波动，
 若能则生成摘要/关联板块（归一化）/评分，存入 importance 表，
@@ -22,9 +26,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
-from common.db import init_db, get_unread, mark_scored, ensure_table, insert_importance
-from common.db.sectors import normalize
-from common.llm_client import call
+from script.common.db import get_unread, mark_scored, insert_importance
+from script.common.db.sectors import normalize
+from llm import call
 
 
 # ---------------------------------------------------------------------------
@@ -32,8 +36,8 @@ from common.llm_client import call
 # ---------------------------------------------------------------------------
 
 DB_PATH = Path(__file__).resolve().parent.parent.parent / "db" / "primary.db"
-SOURCES_CONFIG = Path(__file__).resolve().parent.parent / "config" / "sources.json"
-PROMPT_FILE = Path(__file__).resolve().parent.parent / "prompt" / "事件评估.md"
+SOURCES_CONFIG = Path(__file__).resolve().parent.parent.parent / "config" / "sources.json"
+PROMPT_FILE = Path(__file__).resolve().parent.parent.parent / "prompt" / "事件评估.md"
 LOG_DIR = Path(__file__).resolve().parent.parent.parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 LOG_FILE = LOG_DIR / f"scoring_{datetime.now().strftime('%Y%m%d')}.log"
@@ -61,12 +65,12 @@ def load_prompt_template() -> str:
 def build_prompt(news: dict) -> str:
     """构建评分提示词"""
     template = load_prompt_template()
-    # 将新闻格式化为模板期望的列表格式
-    news_text = f"""{news.get('source_name', '')}
-标题：{news.get('title', '')}
-时间：{news.get('publish_time', '')}
-正文：{news.get('content', '')[:3000]}"""
-    return template.replace("<<news_list>>", news_text)
+    # 替换模板中的占位符
+    prompt = template.replace("<<source_name>>", news.get('source_name', ''))
+    prompt = prompt.replace("<<title>>", news.get('title', '') or '')
+    prompt = prompt.replace("<<publish_time>>", news.get('publish_time', '') or '')
+    prompt = prompt.replace("<<content>>", news.get('content', '')[:3000] or '')
+    return prompt
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +96,7 @@ def format_normalized_sectors(sector_list: list[dict]) -> str:
 # ---------------------------------------------------------------------------
 
 def process_news(news_row: tuple, dry_run: bool = False) -> dict | None:
-    news_id, source_name, title, url, subtitle, publish_time, content = news_row
+    news_id, source_name, title, url, subtitle, publish_time, content, batch_id = news_row
 
     if not content or len(content.strip()) < 20:
         log(f"  [SKIP] id={news_id} content too short, marking as read")
@@ -127,6 +131,7 @@ def process_news(news_row: tuple, dry_run: bool = False) -> dict | None:
     return {
         "skipped": False,
         "news_id": news_id,
+        "batch_id": batch_id,
         "source_name": source_name,
         "title": title,
         "url": url,
@@ -135,6 +140,12 @@ def process_news(news_row: tuple, dry_run: bool = False) -> dict | None:
         "related_sectors": normalized_str,
         "importance_score": result.get("importance_score", 0),
         "reason": result.get("reason", ""),
+        "direction": result.get("direction", ""),
+        "intensity": result.get("intensity", 0),
+        "expected_change": result.get("expected_change", ""),
+        "duration": result.get("duration", ""),
+        "expectation_level": result.get("expectation_level", ""),
+        "market_mode": result.get("market_mode", ""),
     }
 
 
@@ -166,52 +177,73 @@ def calc_batch_size(news_list: list[tuple], max_tokens_per_item: int = 500) -> i
     return min(batch_size, 10)  # 上限10条
 
 
+def process_with_retry(news_row: tuple, dry_run: bool = False, max_retries: int = 3) -> dict | None:
+    """
+    处理单条新闻，带重试机制。
+    如果 LLM 调用异常，立即停止并返回 None。
+    """
+    news_id = news_row[0]
+
+    for attempt in range(max_retries):
+        try:
+            result = process_news(news_row, dry_run=dry_run)
+            return result
+        except Exception as e:
+            log(f"  -> id={news_id} 异常: {type(e).__name__}: {e}")
+            if attempt < max_retries - 1:
+                import time
+                time.sleep(2 ** attempt)  # 指数退避
+                log(f"  -> id={news_id} 重试 {attempt + 2}/{max_retries}")
+            else:
+                log(f"  -> id={news_id} 重试耗尽，保持new状态")
+                return None
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser(description="新闻评分模块")
-    parser.add_argument("--limit", type=int, default=0, help="手动指定每次处理条数（0=自动计算）")
+    parser.add_argument("--limit", type=int, default=5, help="每次循环处理的条数（默认5）")
     parser.add_argument("--dry-run", action="store_true", help="仅模拟，不写入数据库")
+    parser.add_argument("--max-cycles", type=int, default=100, help="最大循环次数（默认100）")
     args = parser.parse_args()
 
     log("=" * 60)
     log(f"News scoring start {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     log(f"DB: {DB_PATH}")
     log(f"Mode: {'DRY-RUN' if args.dry_run else 'LIVE'}")
+    log(f"每轮处理条数: {args.limit}")
     log("=" * 60)
 
-    init_db()
-    ensure_table()
-
-    # 一次读取所有待处理新闻（避免分批查询破坏顺序）
-    all_news = get_unread(limit=100)  # 最多一 次读100条
-    log(f"待处理新闻: {len(all_news)} 条")
-
-    if not all_news:
-        log("没有待处理的新闻，退出。")
-        return
-
-    # 根据内容总长度计算批次大小
-    if args.limit > 0:
-        batch_size = args.limit
-    else:
-        batch_size = calc_batch_size(all_news)
-
-    log(f"动态批次大小: {batch_size} 条/批")
-
+    cycle = 0
     total_ok = 0
     total_skip = 0
-    processed = 0
+    total_failed = 0
 
-    while processed < len(all_news):
-        batch = all_news[processed:processed + batch_size]
-        log(f"\n--- 批次: 起始id={batch[0][0]}, 数量={len(batch)} ---")
+    while cycle < args.max_cycles:
+        cycle += 1
 
-        for news_row in batch:
-            result = process_news(news_row, dry_run=args.dry_run)
+        # 读取待处理新闻（status='read' 且 is_useful=1）
+        all_news = get_unread(limit=args.limit)
+
+        if not all_news:
+            log(f"\n[循环 {cycle}] 没有待处理的新闻，退出。")
+            break
+
+        log(f"\n[循环 {cycle}/{args.max_cycles}] 待处理新闻: {len(all_news)} 条")
+
+        for news_row in all_news:
+            result = process_with_retry(news_row, dry_run=args.dry_run)
 
             news_id = news_row[0]
 
             if result is None:
-                continue
+                # LLM调用失败，停止执行
+                log(f"\n!!! LLM调用异常，停止执行 !!!")
+                log(f"请检查问题后重新运行 scorer.py")
+                log("=" * 60)
+                log(f"当前统计: 评分入库 {total_ok} 条, 跳过 {total_skip} 条, LLM失败 {total_failed} 条")
+                log(f"总循环: {cycle}")
+                return
 
             if result["skipped"]:
                 if not args.dry_run:
@@ -231,10 +263,9 @@ def main():
             import time
             time.sleep(0.5)  # 避免API限流
 
-        processed += len(batch)
-
     log("=" * 60)
-    log(f"完成: 评分入库 {total_ok} 条, 跳过 {total_skip} 条")
+    log(f"完成: 评分入库 {total_ok} 条, 跳过 {total_skip} 条, LLM失败 {total_failed} 条")
+    log(f"总循环: {cycle}")
 
 
 if __name__ == "__main__":

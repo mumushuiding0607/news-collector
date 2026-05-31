@@ -16,19 +16,20 @@ from .connection import get_conn
 def get_all_urls() -> set[str]:
     """返回数据库中所有已入库的 URL（用于去重）"""
     conn = get_conn()
-    cur = conn.execute("SELECT url FROM primary_sources")
+    cur = conn.execute("SELECT url FROM primary_sources WHERE url IS NOT NULL AND url != ''")
     urls = {row[0] for row in cur.fetchall()}
     conn.close()
     return urls
 
 
 def get_unread(limit: int = 10) -> list[tuple]:
-    """读取最新批次中 status='read' 且待评分的新闻，按发布时间倒序"""
+    """读取最新批次中 status='read' 且 is_useful=1 待评分的新闻，按发布时间倒序"""
     conn = get_conn()
     cur = conn.execute("""
-        SELECT id, source_name, title, url, subtitle, publish_time, content
+        SELECT id, source_name, title, url, subtitle, publish_time, content, batch_id
         FROM primary_sources
         WHERE status = 'read'
+          AND is_useful = 1
           AND batch_id = (SELECT MAX(batch_id) FROM primary_sources)
         ORDER BY publish_time DESC
         LIMIT ?
@@ -247,6 +248,82 @@ def get_useful_uncrawled(conn=None) -> list[tuple]:
             ORDER BY publish_time DESC
         """)
         return cur.fetchall()
+    finally:
+        if must_close:
+            conn.close()
+
+
+def delete_by_id(news_id: int, commit: bool = True, conn=None) -> bool:
+    """根据ID删除记录"""
+    must_close = conn is None
+    if conn is None:
+        conn = get_conn()
+    try:
+        conn.execute("DELETE FROM primary_sources WHERE id=?", (news_id,))
+        if commit:
+            conn.commit()
+        return True
+    finally:
+        if must_close:
+            conn.close()
+
+
+def update_content(news_id: int, content: str, content_length: int, publish_time: str, commit: bool = True, conn=None) -> bool:
+    """更新文章正文内容"""
+    must_close = conn is None
+    if conn is None:
+        conn = get_conn()
+    try:
+        conn.execute("""
+            UPDATE primary_sources
+            SET content=?, content_length=?, publish_time=?, content_fetched_at=datetime('now','localtime'), status='read'
+            WHERE id=?
+        """, (content, content_length, publish_time, news_id))
+        if commit:
+            conn.commit()
+        return True
+    finally:
+        if must_close:
+            conn.close()
+
+
+def batch_insert(articles: list[dict], batch_id: int, conn=None) -> int:
+    """
+    批量插入文章（使用共享连接以提高性能）
+
+    Args:
+        articles: 文章列表，每个 dict 包含 source_name, title, url, subtitle, publish_time, content
+        batch_id: 批次号
+        conn: 可选共享连接
+
+    Returns:
+        插入成功的数量
+    """
+    must_close = conn is None
+    if conn is None:
+        conn = get_conn()
+    try:
+        count = 0
+        for article in articles:
+            conn.execute("""
+                INSERT OR IGNORE INTO primary_sources
+                    (source_name, title, url, subtitle, publish_time,
+                     content, content_length, batch_id, status, fetched_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', datetime('now','localtime'))
+            """, (
+                article.get("source_name", ""),
+                article.get("title", ""),
+                article.get("url", ""),
+                article.get("subtitle", ""),
+                article.get("publish_time", ""),
+                article.get("content", ""),
+                len(article.get("content", "") or ""),
+                batch_id,
+            ))
+            if conn.total_changes > 0:
+                count += 1
+        conn.commit()
+        return count
     finally:
         if must_close:
             conn.close()

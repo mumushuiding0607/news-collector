@@ -1,0 +1,24 @@
+# News Collection Project - Dependencies
+# Usage: pip install -r requirements.txt
+
+# ===== Core Dependencies =====
+# Crawling
+crawl4ai>=0.4.0
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+aiohttp>=3.9.0
+
+# Data processing
+pypinyin>=0.53.0
+requests>=2.31.0
+
+# Backend API
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+
+# Environment
+python-dotenv>=1.0.0
+
+# ===== Optional Dependencies =====
+# Run: pip install -r requirements.txt
+# For development: pip install -r requirements.txt --dev

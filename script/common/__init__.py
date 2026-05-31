@@ -8,10 +8,11 @@ common/ - 新闻采集系统公共模块
 模块导出：
   数据库操作：get_conn, insert, get_all_urls 等
   初始化工具：init_all, init_db, check_tables, sync_sectors 等
+  配置：LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, CACHE_DIR, get_sources_config, get_source_config
+  日志：setup_logger, get_logger, timestamp_print
 
 使用：
-  from common import init_all
-  init_all()  # 一键初始化所有数据库资源
+  from common import init_all, get_conn, LLM_API_KEY, timestamp_print
 """
 
 import sqlite3
@@ -24,6 +25,14 @@ from .db.primary_source import (get_all_urls, get_unread, insert, upsert_list_pa
                                  mark_scored, mark_read, get_unfiltered_batch, mark_useful, get_useful_uncrawled)
 from .db.importance import insert as insert_importance, get_recent, get_by_score as get_recent_by_score, get_latest_batch
 from .db.sectors import normalize, fuzzy_match, search, sync_from_iwencai, count as sectors_count
+from . import config
+from . import log
+from .config import (
+    LLM_API_KEY, LLM_BASE_URL, LLM_MODEL,
+    DB_PATH, CACHE_DIR,
+    get_sources_config, get_source_config,
+)
+from .log import setup_logger, get_logger, timestamp_print
 
 # ==================== 路径配置 ====================
 
@@ -72,7 +81,8 @@ def check_tables() -> bool:
     """
     _log("=== 检查数据库表 ===")
 
-    required_tables = ["primary_sources", "importance", "sectors", "sector_indices", "collect_log"]
+    required_tables = ["primary_sources", "importance", "sectors", "sector_indices", "collect_log",
+                      "rag_sectors", "rag_stocks", "rag_eliminated", "rag_reports"]
     required_triggers = ["sectors_ai", "sectors_ad", "sectors_au"]
 
     try:

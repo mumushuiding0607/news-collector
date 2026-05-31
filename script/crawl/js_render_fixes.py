@@ -16,7 +16,7 @@ from pathlib import Path
 
 # 添加项目根目录到 path（确保 content_filter 可导入）
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from common.content_filter import get_content_filter
+from crawl.content.content_filter import get_content_filter
 
 # ---------------------------------------------------------------------------
 # JS 渲染增强配置

@@ -20,7 +20,9 @@ from pathlib import Path
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from common.db import get_conn, init_db, get_unfiltered_batch, mark_useful, get_failed_batch
+from llm import call_async_raw
 
 
 BASE_DIR = Path(__file__).parent.parent.parent.resolve()
@@ -146,8 +148,6 @@ async def process_batch_llm(news_batch: list[dict], timeout: int = 120, max_retr
     template = load_prompt_template()
     prompt = build_batch_prompt(news_batch, template)
 
-    from common.llm_client import call_async_raw
-
     for attempt in range(1, max_retries + 1):
         if attempt > 1:
             log(f"  [RETRY] 第 {attempt} 次尝试，当前批次 {len(news_batch)} 条")
@@ -181,9 +181,6 @@ async def process_batch_llm(news_batch: list[dict], timeout: int = 120, max_retr
         if attempt > 1:
             log(f"  [RETRY] 第 {attempt} 次成功")
         return [(news["id"], r) for news, r in zip(news_batch, results)]
-
-    # 永远不会走到这里，但保持语法正确
-    return [(news["id"], None) for news in news_batch]
 
 
 async def main():

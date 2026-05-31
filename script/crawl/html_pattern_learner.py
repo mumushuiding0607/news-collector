@@ -38,7 +38,7 @@ from pathlib import Path
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from common.llm_client import call_async_raw
+from llm import call_async_raw
 from common.util import parse_publish_time
 
 
@@ -347,7 +347,7 @@ async def test_pattern(source_name: str, test_url: str):
         test_url: 要测试的文章URL
     """
     sys.path.insert(0, str(Path(__file__).parent.parent))
-    from common.html_parser import extract_by_source, get_pattern
+    from crawl.content.html_parser import extract_by_source, get_pattern
 
     log(f"\n{'='*60}")
     log(f"测试模式")
