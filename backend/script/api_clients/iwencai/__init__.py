@@ -1,0 +1,1 @@
+from .iwencai import query_wencai

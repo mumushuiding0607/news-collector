@@ -1,0 +1,31 @@
+# 数据库
+aliyun_key
+aliyun_key.pub
+.env
+.claude/
+.apk
+# 日志
+logs/
+test/
+rag_reports/
+publish/apk/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+
+
+# Crawl4AI
+.cache/
+
+.pem.env
+.env

@@ -1,0 +1,177 @@
+{
+  "app_name": "风向标",
+  "app_subtitle": "热点早知道",
+  "sms_login_enabled": false,
+  "password_login_enabled": true,
+  "subscription_pay_method": "personal",
+  "home": {
+    "title": "风向标",
+    "subtitle": "实时跟踪"
+  },
+  "texts": {
+    "loading": "加载中...",
+    "retry": "重试",
+    "empty_data": "暂无数据",
+    "empty_hot": "暂无热点新闻",
+    "empty_latest": "暂无最新新闻"
+  },
+  "theme": {
+    "background_start": "#FF0D0D0D",
+    "background_end": "#FF141414",
+    "accent_red": "#FFE53935",
+    "accent_red_light": "#FFFF6659",
+    "accent_red_dark": "#FFAB000D",
+    "accent_green": "#FF43A047",
+    "accent_gold": "#FFFFB300",
+    "text_primary": "#FFFFFFFF",
+    "text_secondary": "#FFB0B0B0",
+    "text_muted": "#FF707070",
+    "card_background": "#11E53935",
+    "card_border": "#2BE53935",
+    "card_background_bearish": "#2243A047",
+    "card_border_bearish": "#2B43A047",
+    "border_radius": 20,
+    "glass_red": "#33E53935",
+    "glass_red_border": "#55E53935"
+  },
+  "lock": {
+    "free_news_limit": 2,
+    "lock_title": "订阅后可查看完整内容",
+    "lock_button_logged_in": "立即订阅",
+    "lock_button_not_logged_in": "登录后订阅",
+    "subscription_title": "订阅服务"
+  },
+  "timeouts": {
+    "default": 10,
+    "source": 30,
+    "create_order": 15
+  },
+  "dims_labels": {
+    "competitiveness": "竞争力",
+    "竞争": "竞争力",
+    "growth": "成长性",
+    "盈利": "成长性",
+    "valuation": "估值",
+    "客户": "估值",
+    "certainty": "确定性",
+    "技术": "确定性"
+  },
+  "features": {
+    "subscription_enabled": false
+  },
+  "ui_texts": {
+    "login": {
+      "tab_code": "验证码登录",
+      "tab_password": "密码登录",
+      "hint_email": "请输入邮箱",
+      "hint_code": "请输入验证码",
+      "hint_password": "请输入密码",
+      "btn_send_code": "发送验证码",
+      "btn_login": "登录",
+      "btn_register": "注册",
+      "link_no_account": "没有账号？去注册",
+      "link_forgot_password": "忘记密码？"
+    },
+    "subscription": {
+      "success": "订阅成功！",
+      "scan_qr_title": "请扫码转账",
+      "wechat_qr_title": "请使用微信扫码支付",
+      "pay_note": "付款备注：注册时的邮箱或手机号"
+    },
+    "news_list": {
+      "tab_hot": "热点",
+      "tab_latest": "最新",
+      "tab_history": "历史"
+    },
+    "side_drawer": {
+      "account_manage": "账号管理",
+      "sources": "数据源",
+      "notifications": "消息通知",
+      "settings": "系统设置",
+      "feedback": "意见反馈",
+      "logout": "退出登录",
+      "free_user": "免费用户"
+    }
+  },
+  "subscription_tiers": [
+    {
+      "level": "free",
+      "name": "免费版",
+      "price": 0,
+      "duration_days": 0,
+      "description": "每日免费新闻浏览",
+      "features": [
+        "每日10条新闻",
+        "基础板块涨跌",
+        "热门列表浏览"
+      ]
+    },
+    {
+      "level": "pro",
+      "name": "专业版",
+      "price": 10,
+      "duration_days": 30,
+      "description": "解锁全部热点内容",
+      "features": [
+        "无限新闻",
+        "完整板块数据",
+        "核心标的详情",
+        "热点推送"
+      ]
+    },
+    {
+      "level": "premium",
+      "name": "高级版",
+      "price": 299,
+      "duration_days": 90,
+      "description": "最高权限，机构级决策支持",
+      "features": [
+        "Pro全部功能",
+        "深度分析",
+        "机构级决策",
+        "专属顾问",
+        "定制关注"
+      ]
+    }
+  ],
+  "scheduler": {},
+  "app_version": {
+    "latest_version": "1.0.12",
+    "latest_build": 12,
+    "min_required_version": "1.0.0",
+    "min_required_build": 1,
+    "update_description": "修复若干问题，提升稳定性",
+    "force_update": false,
+    "update_channels": {
+      "self_hosted": {
+        "enabled": true,
+        "filename_pattern": "news_board_{version}.apk"
+      },
+      "huawei": {
+        "enabled": false,
+        "app_id": ""
+      },
+      "xiaomi": {
+        "enabled": false,
+        "package_name": ""
+      }
+    }
+  },
+  "download": {
+    "huawei_app_id": "C33455",
+    "channels": [
+      {
+        "name": "华为应用市场",
+        "icon": "huawei",
+        "url": "",
+        "enabled": false
+      },
+      {
+        "name": "直接下载",
+        "icon": "download",
+        "url": "",
+        "enabled": true
+      }
+    ]
+  }
+}

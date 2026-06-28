@@ -1,0 +1,49 @@
+@echo off
+REM ================================================================
+REM Upload APK to Server (Self-hosted distribution)
+REM ================================================================
+REM
+REM Preconditions:
+REM   - publish/.env has SERVER_IP, SERVER_USER, SERVER_PORT, SSH_KEY
+REM   - Server backend/apk/ directory exists and is writable
+REM ================================================================
+
+setlocal enabledelayedexpansion
+
+set "SCRIPT_DIR=%~dp0"
+set "PROJECT_ROOT=%~dp0..\news_board_app"
+
+call "%SCRIPT_DIR%load_env.bat"
+if errorlevel 1 (
+    echo [ERROR] Failed to load config
+    exit /b 1
+)
+
+REM 从 metadata.json 读取版本
+for /f "delims=" %%v in ('python "%SCRIPT_DIR%get_version.py" version_name') do set "VERSION_NAME=%%v"
+for /f "delims=" %%c in ('python "%SCRIPT_DIR%get_version.py" version_code') do set "VERSION_CODE=%%c"
+
+set "APK_SOURCE=%SCRIPT_DIR%apk\news_board_!VERSION_NAME!.apk"
+set "REMOTE_PATH=/opt/app/apk"
+set "APK_FILENAME=news_board_!VERSION_NAME!.apk"
+
+if not exist "!APK_SOURCE!" (
+    echo [ERROR] APK not found: !APK_SOURCE!
+    exit /b 1
+)
+
+REM ================================================================
+REM Upload APK to server
+REM ================================================================
+echo [INFO] Uploading APK to server...
+echo   Source: !APK_SOURCE!
+echo   Dest: !SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/!APK_FILENAME!
+
+scp -P !SERVER_PORT! -i "!SSH_KEY!" "!APK_SOURCE!" "!SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/!APK_FILENAME!"
+if errorlevel 1 (
+    echo [ERROR] APK upload failed
+    exit /b 1
+)
+
+echo [OK] APK upload complete
+exit /b 0

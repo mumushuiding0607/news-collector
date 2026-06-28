@@ -1,0 +1,11 @@
+{
+  "api": {
+    "baseUrl": "http://127.0.0.1:31234",
+    "baseUrlProd": "http://39.105.23.221:31234"
+  },
+  "timeouts": {
+    "default": 10,
+    "source": 30,
+    "createOrder": 15
+  }
+}

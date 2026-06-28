@@ -1,0 +1,101 @@
+@echo off
+REM ================================================================
+REM Auto Update Backend Version Config
+REM ================================================================
+REM
+REM Functions:
+REM 1. Update latest_version and latest_build from metadata.json
+REM   2. Update update_description from metadata.json
+REM
+REM Preconditions:
+REM   - publish/.env configured with server connection info
+REM   - Server backend/config.json is writable
+REM ================================================================
+
+setlocal enabledelayedexpansion
+
+set "SCRIPT_DIR=%~dp0"
+
+call "%SCRIPT_DIR%load_env.bat"
+if errorlevel 1 (
+    echo [ERROR] Failed to load config
+    exit /b 1
+)
+
+REM 从 metadata.json 读取版本
+for /f "delims=" %%v in ('python "%SCRIPT_DIR%get_version.py" version_name') do set "VERSION_NAME=%%v"
+for /f "delims=" %%c in ('python "%SCRIPT_DIR%get_version.py" version_code') do set "VERSION_CODE=%%c"
+for /f "delims=" %%d in ('python "%SCRIPT_DIR%get_version.py" update_description') do set "UPDATE_DESC=%%d"
+
+echo [INFO] Version: !VERSION_NAME! (build !VERSION_CODE!)
+echo [INFO] Update desc: !UPDATE_DESC!
+
+REM ================================================================
+REM Remote paths
+REM ================================================================
+set "REMOTE_CONFIG=/opt/app/backend/config.json"
+set "LOCAL_CONFIG=!TEMP!\config_update_!RANDOM!.json"
+set "UPDATE_SCRIPT=!TEMP!\update_config_!RANDOM!.py"
+
+REM ================================================================
+REM Download remote config
+REM ================================================================
+echo [INFO] Downloading remote config...
+scp -P !SERVER_PORT! -i "!SSH_KEY!" "!SERVER_USER!@!SERVER_IP!:!REMOTE_CONFIG!" "!LOCAL_CONFIG!"
+if errorlevel 1 (
+    echo [ERROR] Failed to fetch remote config
+    exit /b 1
+)
+echo [OK] Downloaded
+
+REM ================================================================
+REM Build Python script for in-place update
+REM ================================================================
+(
+echo import json
+echo import sys
+echo config_path = r"!LOCAL_CONFIG!"
+echo new_version = r"!VERSION_NAME!"
+echo new_build = int("!VERSION_CODE!")
+echo update_desc = r"!UPDATE_DESC!"
+echo with open(config_path, 'r', encoding='utf-8') as f:
+echo     config = json.load(f)
+echo if 'app_version' not in config:
+echo     config['app_version'] = {}
+echo config['app_version']['latest_version'] = new_version
+echo config['app_version']['latest_build'] = new_build
+echo config['app_version']['update_description'] = update_desc
+echo with open(config_path, 'w', encoding='utf-8') as f:
+echo     json.dump(config, f, ensure_ascii=False, indent=2)
+echo print("Config updated successfully")
+) > "!UPDATE_SCRIPT!"
+
+python "!UPDATE_SCRIPT!"
+if errorlevel 1 (
+    echo [ERROR] Config update failed
+    del "!LOCAL_CONFIG!" 2>nul
+    del "!UPDATE_SCRIPT!" 2>nul
+    exit /b 1
+)
+
+REM ================================================================
+REM Upload updated config
+REM ================================================================
+echo [INFO] Uploading updated config to server...
+scp -P !SERVER_PORT! -i "!SSH_KEY!" "!LOCAL_CONFIG!" "!SERVER_USER!@!SERVER_IP!:!REMOTE_CONFIG!"
+if errorlevel 1 (
+    echo [ERROR] Config upload failed
+    del "!LOCAL_CONFIG!" 2>nul
+    del "!UPDATE_SCRIPT!" 2>nul
+    exit /b 1
+)
+
+echo [OK] Version config updated
+echo   latest_version: !VERSION_NAME!
+echo   latest_build: !VERSION_CODE!
+echo   update_description: !UPDATE_DESC!
+
+del "!LOCAL_CONFIG!" 2>nul
+del "!UPDATE_SCRIPT!" 2>nul
+
+exit /b 0

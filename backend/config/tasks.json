@@ -1,0 +1,50 @@
+{
+  "enabled": true,
+  "tasks": [
+    {
+      "id": "news_pipeline",
+      "name": "采集和评分",
+      "description": "采集和评分",
+      "cron": "0 0 9-15 * * MON-FRI",
+      "enabled": true,
+      "trigOnDeploy": true,
+      "handler": "backend.service.news_pipeline.run_pipeline"
+    },
+    {
+      "id": "sector_change_rates",
+      "name": "板块涨跌幅更新",
+      "description": "每20分钟查询板块涨跌幅并更新新闻缓存，仅交易时段执行",
+      "cron": "0 30 9-15 * * MON-FRI",
+      "enabled": true,
+      "trigOnDeploy": false,
+      "handler": "backend.core.news_service.update_sector_change_rates"
+    },
+    {
+      "id": "news_stocks_change_rates",
+      "name": "个股涨跌幅同步",
+      "description": "查询最近3天新闻关联股票，调用问财获取涨跌幅并更新d1/d2/d3字段",
+      "cron": "0 10 15 * * MON-FRI",
+      "enabled": true,
+      "trigOnDeploy": false,
+      "handler": "backend.service.news_stocks.sync_news_stocks_change_rates"
+    },
+    {
+      "id": "source_discovery",
+      "name": "异动消息数据源发现",
+      "description": "周一至周五 11:30 和 16:00 从同花顺异动页面发现数据源并保存",
+      "cron": "0 30 11,16 * * MON-FRI",
+      "enabled": true,
+      "trigOnDeploy": false,
+      "handler": "script.discovery.source_discovery.discover_and_schedule"
+    },
+    {
+      "id": "anomaly_summary",
+      "name": "异动简报生成",
+      "description": "周一至周五 11:30 和 15:30 生成异动简报",
+      "cron": "0 30 11,15 * * MON-FRI",
+      "enabled": true,
+      "trigOnDeploy": false,
+      "handler": "script.anomaly_summary.generate_summary"
+    }
+  ]
+}

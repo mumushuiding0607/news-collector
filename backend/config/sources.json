@@ -1,0 +1,15 @@
+{
+  "crawNumPerSource": 30,
+  "maxConsecutiveNonToday": 10,
+  "llmBatchSize": 20,
+  "llmTimeout": 120,
+  "llmMaxRetries": 3,
+  "newsFilterTimeout": 60,
+  "scorerTimeout": 90,
+  "findStocksTimeout": 120,
+  "newsCache": {
+    "minScore": 5,
+    "hotNewsMinScore": 8,
+    "historyDays": 3
+  }
+}

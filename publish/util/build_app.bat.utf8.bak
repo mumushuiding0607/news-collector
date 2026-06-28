@@ -1,0 +1,144 @@
+@echo off
+REM ================================================================
+REM 风向标AI - Flutter APK 构建脚本
+REM ================================================================
+REM
+REM 依赖项:
+REM   - Flutter SDK
+REM   - JDK17+ (JAVA_HOME in .env)
+REM   - 签名密钥 (ANDROID_SDK_KEYSTORE in .env)
+REM   - signing.properties (news_board_app/android/app/signing.properties)
+REM
+REM 用法: 双击运行，或 cmd: build_app.bat
+REM ================================================================
+
+setlocal enabledelayedexpansion
+
+set "SCRIPT_DIR=%~dp0"
+set "PROJECT_ROOT=%~dp0..\news_board_app"
+
+REM ================================================================
+REM 加载 .env 配置
+REM ================================================================
+call "%SCRIPT_DIR%load_env.bat"
+if errorlevel 1 (
+    echo [ERROR] 加载配置失败
+    exit /b 1
+)
+
+REM 从 metadata.json 读取版本
+for /f "delims=" %%v in ('python "%SCRIPT_DIR%get_version.py" version_name') do set "VERSION_NAME=%%v"
+for /f "delims=" %%c in ('python "%SCRIPT_DIR%get_version.py" version_code') do set "VERSION_CODE=%%c"
+
+echo ================================================================
+echo   风向标AI - Flutter 构建脚本
+echo ================================================================
+echo   版本: !VERSION_NAME! (versionCode !VERSION_CODE!)
+echo ================================================================
+
+REM ================================================================
+REM 检查环境
+REM ================================================================
+echo [CHECK] 检查环境...
+if not exist "!JAVA_HOME!\bin\java.exe" (
+    echo [ERROR] JDK not found: !JAVA_HOME!\bin\java.exe
+    echo [INFO] 请检查 .env 中 JAVA_HOME 配置
+    exit /b 1
+)
+echo   [OK] JDK found
+
+if not exist "!FLUTTER_SDK!\bin\flutter.bat" (
+    echo [ERROR] Flutter SDK not found: !FLUTTER_SDK!\bin\flutter.bat
+    exit /b 1
+)
+echo   [OK] Flutter SDK found
+
+REM ================================================================
+REM 设置环境变量
+REM ================================================================
+set "PATH=!JAVA_HOME!\bin;!FLUTTER_SDK!\bin;%PATH%"
+
+cd /d "!PROJECT_ROOT!"
+
+REM ================================================================
+REM 构建
+REM ================================================================
+echo.
+echo [INFO] flutter clean...
+call "!FLUTTER_SDK!\bin\flutter.bat" clean >nul 2>&1
+echo   [OK] clean 完成
+
+echo.
+echo [INFO] flutter pub get...
+call "!FLUTTER_SDK!\bin\flutter.bat" pub get 2>&1 | findstr /C:"Got dependencies"
+echo   [OK] 依赖获取完成
+
+echo.
+echo [INFO] flutter build apk --release...
+call "!FLUTTER_SDK!\bin\flutter.bat" build apk --release 2>&1
+
+if errorlevel 1 (
+    echo.
+    echo [ERROR] APK 构建失败
+    exit /b 1
+)
+
+REM ================================================================
+REM 验证产物
+REM ================================================================
+set "APK_SRC=!PROJECT_ROOT!\build\app\outputs\flutter-apk\app-release.apk"
+if exist "!APK_SRC!" (
+    for %%a in ("!APK_SRC!") do set "APK_SIZE=%%~za"
+    set "APK_SIZE_MB=!APK_SIZE:~0,-3!"
+    echo.
+    echo   [OK] APK 构建完成
+) else (
+    echo [ERROR] APK 文件未找到
+    exit /b 1
+)
+
+REM ================================================================
+REM 复制 APK 到 publish/apk 目录
+REM ================================================================
+echo.
+echo [INFO] 复制 APK 到 publish/apk...
+if not exist "%SCRIPT_DIR%apk" mkdir "%SCRIPT_DIR%apk"
+set "APK_DEST=%SCRIPT_DIR%apk\news_board_!VERSION_NAME!.apk"
+copy /Y "!APK_SRC!" "!APK_DEST!" >nul
+if errorlevel 1 (
+    echo [ERROR] APK 复制失败
+    exit /b 1
+)
+echo   [OK] APK 已复制到 !APK_DEST!
+
+echo.
+echo ================================================================
+echo   构建完成
+echo ================================================================
+echo   APK: !APK_DEST!
+echo   大小: !APK_SIZE_MB! KB
+echo   版本: !VERSION_NAME! (versionCode !VERSION_CODE!)
+echo ================================================================
+
+REM ================================================================
+REM Step 5: 上传 APK 到服务器（自分发渠道）
+REM ================================================================
+echo.
+call "%SCRIPT_DIR%upload_apk.bat"
+if errorlevel 1 (
+    echo [WARN] APK 上传失败，请手动上传
+) else (
+    echo [OK] APK 已上传到服务器
+)
+
+REM ================================================================
+REM Step 6: 自动更新后端版本配置
+REM ================================================================
+echo.
+call "%SCRIPT_DIR%update_version.bat"
+if errorlevel 1 (
+    echo [WARN] 版本配置更新失败，请手动更新 backend/config.json
+) else (
+    echo [OK] 版本配置已更新
+)
+

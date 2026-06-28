@@ -1,0 +1,33 @@
+你是一个新闻评分回测专家。请根据以下信息，生成一段Python代码，实现新闻评分的回测功能。
+
+## 回测目的
+验证新闻的关联板块、重要性评分、行情预测是否与用户评论的判断一致，从而评估评分系统的准确率。
+
+## 输入数据（来自数据库）
+- importance 表字段：title, summary, related_sectors, importance_score, reason, publish_time
+- comments 表字段：news_id, user_id, content, created_at
+- auth_users 表字段：id, phone
+
+## 回测维度（LLM判断）
+1. 板块相关性：用户评论是否提及相关板块，判断是否正确关联
+2. 评分合理性：用户评论情绪与 importance_score 是否匹配（高分区评论应偏正面，低分区评论应偏中性或质疑）
+3. 预测正确性：用户评论对行情的判断（涨/跌/中性）是否被后续市场验证
+
+## 输出要求
+代码应：
+1. 从数据库查询指定时间范围内的新闻及评论
+2. 调用LLM逐条分析评论与新闻的匹配度
+3. 将回测结果存入 backtest_results 表
+4. 输出准确率统计
+
+## 数据库表（需新建）
+backtest_results: id, news_id, sector_relevance(0-1), score_accuracy(0-1), prediction_accuracy(0-1), llm_analysis, created_at
+
+## 代码要求
+- 使用已有的db.connection.get_conn()
+- 使用已有的llm_client.call()
+- 支持指定时间范围参数
+- 支持单条和批量回测
+- 结果持久化到SQLite
+
+请生成完整的Python回测脚本：script/backtest/evaluator.py
