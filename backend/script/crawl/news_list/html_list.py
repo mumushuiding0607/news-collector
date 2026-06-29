@@ -511,7 +511,10 @@ def extract_list_articles(html: str, markdown: str, source_name: str, list_confi
         # 再次检查是否有 URL
         if any(a.get("url") for a in css_articles):
             return css_articles
-        # CSS 选择器仍然没有有效 URL，回退到 HTML 直接提取
+        # CSS 选择器仍然没有有效 URL，但有有效内容（时间+标题），直接返回
+        if css_articles and any((a.get("time") or a.get("title")) for a in css_articles):
+            return css_articles
+        # CSS 选择器没有有效内容，回退到 HTML 直接提取
         return _extract_links_from_html_fallback(html, source_name, base_url)
     elif phase1_articles:
         # 没有 CSS 选择器时，用 markdown 结果

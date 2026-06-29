@@ -271,6 +271,9 @@ def extract_news_containers(html: str) -> list[str]:
             # 如果当前元素是某个已保留容器的后代（当前元素是内层子容器），跳过
             if any(element in kept_elem.descendants for kept_elem, _ in kept_elements):
                 continue
+            # 如果当前元素是某个已保留容器的祖先（当前元素是外层容器），跳过（避免嵌套容器重复）
+            if any(kept_elem in element.descendants for kept_elem, _ in kept_elements):
+                continue
             # 对容器内部进行二次剪枝，移除空结构元素
             container_soup = BeautifulSoup(container_str, 'html.parser')
             _prune_container(container_soup)

@@ -126,22 +126,25 @@ def step3_truncate_list(input_path: Path, output_dir: Path, name: str) -> Path:
     return output_path
 
 
-def step4_discover_list(url: str, input_path: Path, output_dir: Path, name: str, headline: str = "") -> Path:
+def step4_discover_list(url: str, input_path: Path, output_dir: Path, name: str, headline: str = "", force_relearn: bool = False) -> Path:
     """Step 4: discover_list_config LLM DOM 分析
 
     Args:
         headline: 已知文章标题，用于多候选列表块时 LLM 消歧
+        force_relearn: True 时跳过 __NEXT_DATA__ 快捷路径，强制 LLM 分析
     """
     print(f"[Step 4] discover_list_config LLM DOM 分析")
     if headline:
         print(f"[Step 4] 使用已知标题消歧: {headline}")
+    if force_relearn:
+        print(f"[Step 4] force_relearn=True，跳过 __NEXT_DATA__ 快捷路径")
 
     with open(input_path, 'r', encoding='utf-8') as f:
         html = f.read()
 
     # input 是已清洗 + 截断后的 HTML，传给 discover_list_config 时需告知跳过内部 clean
     # 否则二次 clean 会把 HTML 压到几乎为空，LLM 无法识别列表块
-    result = discover_list_config(url, html, headline=headline, already_cleaned=True)
+    result = discover_list_config(url, html, headline=headline, already_cleaned=True, force_relearn=force_relearn)
 
     output_path = output_dir / f"{name}.json"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -387,7 +390,7 @@ def main():
                 print("[ERROR] Step 3 输出不存在，无法继续")
                 continue
             # Step 4 总是重跑（LLM 结果可能变化，且 --title 会影响消歧）
-            step_paths[4] = step4_discover_list(url, step_paths[3], TEST_DIR / "list_dom_result", name, headline=headline)
+            step_paths[4] = step4_discover_list(url, step_paths[3], TEST_DIR / "list_dom_result", name, headline=headline, force_relearn=force_rerun)
 
         # 获取文章 URL
         if start_step <= 4:
