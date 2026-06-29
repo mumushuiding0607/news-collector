@@ -196,7 +196,7 @@ echo.
 echo ================================================================
 echo   Step 3b: Install Playwright Browsers
 echo ================================================================
-!SSH_FULL! "if [ -d '/root/.cache/ms-playwright' ]; then cd '%REMOTE_PATH%' && python3 -m playwright install chromium; fi"
+!SSH_FULL! "if [ ! -f '/root/.cache/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-linux64/chrome-headless-shell' ]; then echo '[ERROR] Playwright chromium not found, please run install_playwright.bat first'; else echo '[SKIP] Playwright chromium already installed'; fi"
 echo [OK] Playwright check complete
 
 REM ================================================================
