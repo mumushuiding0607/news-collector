@@ -1,7 +1,7 @@
 name: news_board
 description: "News Board - Market Hot Tracking App"
 publish_to: 'none'
-version: 1.0.12
+version: 1.0.14
 
 environment:
   sdk: ^3.12.0
