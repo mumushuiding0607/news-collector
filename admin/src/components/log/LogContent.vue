@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from "vue";
+import { watch, nextTick } from "vue";
 
 const props = defineProps<{
   lines: string[];
@@ -10,8 +10,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "refresh"): void;
 }>();
-
-const logContainerRef = ref<HTMLElement | null>(null);
 
 function lineColor(line: string): string {
   if (line.includes("ERROR")) return "var(--danger)";
@@ -35,7 +33,6 @@ watch(() => props.lines.length, async () => {
     </div>
 
     <div
-      ref="logContainerRef"
       :style="isMobile
         ? 'flex: 1; overflow-y: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 10px; font-family: monospace; font-size: 11px; line-height: 1.6; min-height: 150px'
         : 'flex: 1; overflow-y: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 12px; font-family: monospace; font-size: 12px; line-height: 1.6; min-height: 200px'"

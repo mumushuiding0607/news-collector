@@ -75,12 +75,6 @@ if ($PIP_ACTION -ne "SKIP") {
     Write-Host "  Step 4: Install Python Dependencies"
     Write-Host "================================================================"
 
-    Write-Host "[INFO] Installing lxml via apt..."
-    Invoke-SSH "LC_ALL=C apt-get install -y python3-lxml > /dev/null 2>&1 || true" | Out-Null
-
-    Write-Host "[INFO] Removing lxml and crawl4ai from requirements.txt..."
-    Invoke-SSH "sed -i '/^lxml/d' '$REMOTE_PATH/requirements.txt' && sed -i '/^crawl4ai/d' '$REMOTE_PATH/requirements.txt'" | Out-Null
-
     Write-Host "[INFO] Installing packages..."
     Invoke-SSH "cd '$REMOTE_PATH' && LC_ALL=C python3 -m pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --no-cache-dir --break-system-packages" | Out-Null
 

@@ -24,6 +24,8 @@ __all__ = [
     "get_crawl_config",
     "get_crawl_config_by_url",
     "find_learned_config_by_name",
+    "get_crawl_config_by_domain",
+    "extract_domain",
     "upsert_crawl_config",
     "ensure_crawl_config",
     "list_sources_with_configs",
@@ -230,6 +232,28 @@ def get_crawl_config_by_name(source_name: str) -> dict | None:
         return rows[0] if rows else None
     finally:
         put_conn(conn)
+
+
+def get_crawl_config_by_domain(domain: str) -> dict | None:
+    """通过域名查找配置（用于域名级别去重）"""
+    if not domain:
+        return None
+    conn = get_conn()
+    try:
+        rows = _dict(conn,
+            "SELECT * FROM source_crawl_configs WHERE url_norm LIKE ?",
+            (f"%://{domain}/%",),
+        )
+        return rows[0] if rows else None
+    finally:
+        put_conn(conn)
+
+
+def extract_domain(url: str) -> str:
+    """从 URL 提取域名，如 https://www.cnstock.com/article -> www.cnstock.com"""
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    return parsed.netloc
 
 
 def ensure_crawl_config(source_id: int, name: str | None = None,

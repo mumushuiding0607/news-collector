@@ -7,9 +7,9 @@ export const useUserStore = defineStore("user", () => {
   const userInfo = ref<Record<string, unknown>>({});
 
   async function login(phone: string, code: string) {
-    const data = await apiLogin(phone, code) as Record<string, unknown>;
+    const data = await apiLogin(phone, code) as unknown as Record<string, unknown>;
     token.value = (data.token as string) || "";
-    userInfo.value = data.user || {};
+    userInfo.value = (data.user as Record<string, unknown>) || {};
     if (token.value) {
       localStorage.setItem("admin_token", token.value);
     }
@@ -17,9 +17,9 @@ export const useUserStore = defineStore("user", () => {
   }
 
   async function loginByEmail(email: string, password: string) {
-    const data = await apiLoginPassword(email, password) as Record<string, unknown>;
+    const data = await apiLoginPassword(email, password) as unknown as Record<string, unknown>;
     token.value = (data.token as string) || "";
-    userInfo.value = data.user || {};
+    userInfo.value = (data.user as Record<string, unknown>) || {};
     if (token.value) {
       localStorage.setItem("admin_token", token.value);
     }

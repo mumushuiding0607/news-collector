@@ -16,24 +16,36 @@ class SideDrawer extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
     final config = ref.watch(configProvider);
+    final theme = ref.watch(effectiveThemeConfigProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    final isDark = themeMode == AppThemeMode.dark;
     final uiTexts = config.uiTexts.sideDrawer;
     final features = config.features;
+
+    // 颜色主题
+    final handleColor = isDark ? Colors.white24 : Colors.black12;
+    final avatarBgColor = isDark ? Colors.amber.shade700 : Colors.amber.shade600;
+    final textPrimary = isDark ? Colors.white : theme.textPrimaryColor;
+    final textSecondary = isDark ? Colors.white54 : theme.textSecondaryColor;
+    final textMuted = isDark ? Colors.white38 : theme.textMutedColor;
+    final menuIconColor = isDark ? Colors.white70 : theme.textSecondaryColor;
+    final menuTextColor = isDark ? Colors.white : theme.textPrimaryColor;
 
     Widget content = Container(
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildHandle(),
+          _buildHandle(handleColor),
           const SizedBox(height: 24),
-          _buildUserInfo(authState, uiTexts.freeUser, features.subscriptionEnabled),
+          _buildUserInfo(authState, uiTexts.freeUser, features.subscriptionEnabled, avatarBgColor, textPrimary, textSecondary),
           const SizedBox(height: 24),
           Expanded(
             child: ListView(
               controller: scrollController,
               shrinkWrap: true,
               children: [
-                _buildMenuItem(context, Icons.summarize_outlined, uiTexts.briefing, () {
+                _buildMenuItem(context, Icons.summarize_outlined, uiTexts.briefing, menuIconColor, menuTextColor, () {
                   Navigator.pop(context);
                   showGeneralDialog(
                     context: context,
@@ -44,7 +56,7 @@ class SideDrawer extends ConsumerWidget {
                     pageBuilder: (_, __, ___) => const SummaryDialog(),
                   );
                 }),
-                _buildMenuItem(context, Icons.person_outline, uiTexts.accountManage, () {
+                _buildMenuItem(context, Icons.person_outline, uiTexts.accountManage, menuIconColor, menuTextColor, () {
                   Navigator.pop(context);
                   if (authState.isLoggedIn) {
                     context.go('/account');
@@ -53,10 +65,10 @@ class SideDrawer extends ConsumerWidget {
                   }
                 }),
                 if (features.notificationsEnabled)
-                  _buildMenuItem(context, Icons.notifications_outlined, uiTexts.notifications, () {}),
-                _buildMenuItem(context, Icons.settings_outlined, uiTexts.settings, () {}),
+                  _buildMenuItem(context, Icons.notifications_outlined, uiTexts.notifications, menuIconColor, menuTextColor, () {}),
+                _buildMenuItem(context, Icons.settings_outlined, uiTexts.settings, menuIconColor, menuTextColor, () {}),
                 if (features.feedbackEnabled)
-                  _buildMenuItem(context, Icons.feedback_outlined, uiTexts.feedback, () {
+                  _buildMenuItem(context, Icons.feedback_outlined, uiTexts.feedback, menuIconColor, menuTextColor, () {
                     Navigator.pop(context);
                     showGeneralDialog(
                       context: context,
@@ -134,25 +146,25 @@ class SideDrawer extends ConsumerWidget {
     );
   }
 
-  Widget _buildHandle() {
+  Widget _buildHandle(Color color) {
     return Container(
       width: 40,
       height: 4,
       decoration: BoxDecoration(
-        color: Colors.white24,
+        color: color,
         borderRadius: BorderRadius.circular(2),
       ),
     );
   }
 
-  Widget _buildUserInfo(AuthState authState, String freeUserText, bool subscriptionEnabled) {
+  Widget _buildUserInfo(AuthState authState, String freeUserText, bool subscriptionEnabled, Color avatarBgColor, Color textPrimary, Color textSecondary) {
     final email = authState.currentUser?.email ?? '游客';
     final displayText = email.length >= 3 ? email.substring(0, 3) : email;
     return Row(
       children: [
         CircleAvatar(
           radius: 28,
-          backgroundColor: Colors.amber.shade700,
+          backgroundColor: avatarBgColor,
           child: Text(
             displayText,
             style: const TextStyle(color: Colors.white, fontSize: 16),
@@ -165,13 +177,13 @@ class SideDrawer extends ConsumerWidget {
             children: [
               Text(
                 email,
-                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(color: textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
                 overflow: TextOverflow.ellipsis,
               ),
               if (subscriptionEnabled)
                 Text(
                   authState.subscriptionLevel == 'free' ? freeUserText : '${authState.subscriptionLevel}会员',
-                  style: const TextStyle(color: Colors.white54, fontSize: 14),
+                  style: TextStyle(color: textSecondary, fontSize: 14),
                 ),
             ],
           ),
@@ -180,10 +192,10 @@ class SideDrawer extends ConsumerWidget {
     );
   }
 
-  Widget _buildMenuItem(BuildContext context, IconData icon, String label, VoidCallback onTap) {
+  Widget _buildMenuItem(BuildContext context, IconData icon, String label, Color iconColor, Color textColor, VoidCallback onTap) {
     return ListTile(
-      leading: Icon(icon, color: Colors.white70, size: 22),
-      title: Text(label, style: const TextStyle(color: Colors.white, fontSize: 15)),
+      leading: Icon(icon, color: iconColor, size: 22),
+      title: Text(label, style: TextStyle(color: textColor, fontSize: 15)),
       onTap: onTap,
       contentPadding: const EdgeInsets.only(left: 4, right: 8),
       visualDensity: VisualDensity.compact,

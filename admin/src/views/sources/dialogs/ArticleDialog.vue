@@ -24,17 +24,18 @@ watch(
   () => [props.visible, props.row],
   async ([v, row]) => {
     if (v && row) {
-      const url = row.url as string;
+      const r = row as Record<string, unknown>;
+      const url = r.url as string;
       if (!url) {
         content.value = "文章 URL 为空";
         return;
       }
-      title.value = (row.title as string) || "";
-      publishDate.value = (row.time as string) || "";
+      title.value = (r.title as string) || "";
+      publishDate.value = (r.time as string) || "";
       loading.value = true;
       content.value = "";
       try {
-        const result = (await fetchArticleContent(url, props.sourceName)) as Record<string, unknown>;
+        const result = (await fetchArticleContent(url, props.sourceName)) as unknown as Record<string, unknown>;
         content.value = (result.content as string) || "";
         publishDate.value = (result.publish_date as string) || publishDate.value;
         if (!content.value) content.value = "未能获取到文章内容";

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/repositories/config_repository.dart';
 
 /// 超时配置
@@ -551,6 +552,75 @@ class ThemeConfig {
     ],
   );
 }
+
+/// 主题模式
+enum AppThemeMode { dark, light }
+
+/// 浅色主题配置 - 温暖、精致的报纸风格
+final lightThemeConfig = ThemeConfig(
+  backgroundStart: '#FFF8F6F3',  // 温暖米白
+  backgroundEnd: '#FFF2EDE8',     // 略深的暖灰
+  accentRed: '#FFE53935',
+  accentRedLight: '#FFFF6659',
+  accentRedDark: '#FFAB000D',
+  accentGreen: '#FF43A047',
+  accentGold: '#FFFFB300',
+  textPrimary: '#FF1C1C1E',      // 深灰（非纯黑）
+  textSecondary: '#FF5C5C5C',
+  textMuted: '#FF9B9B9B',
+  cardBackground: '#FFFFFFFF',    // 纯白卡片
+  cardBorder: '#FFE8E4DE',       // 暖灰边框
+  cardBackgroundBearish: '#1143A047',
+  cardBorderBearish: '#2B43A047',
+  borderRadius: 20,
+  glassRed: '#22E53935',         // 更淡的红色
+  glassRedBorder: '#33E53935',
+);
+
+/// 主题模式管理器（支持持久化）
+class ThemeModeNotifier extends StateNotifier<AppThemeMode> {
+  static const _key = 'app_theme_mode';
+  final SharedPreferences? _prefs;
+
+  ThemeModeNotifier(this._prefs) : super(_load(_prefs));
+
+  static AppThemeMode _load(SharedPreferences? prefs) {
+    if (prefs == null) return AppThemeMode.dark;
+    final idx = prefs.getInt(_key) ?? 0;
+    return AppThemeMode.values[idx.clamp(0, 1)];
+  }
+
+  Future<void> toggle() async {
+    state = state == AppThemeMode.dark ? AppThemeMode.light : AppThemeMode.dark;
+    await _prefs?.setInt(_key, state.index);
+  }
+
+  void setMode(AppThemeMode mode) {
+    state = mode;
+    _prefs?.setInt(_key, mode.index);
+  }
+}
+
+/// Provider（需要先初始化 SharedPreferences）
+final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, AppThemeMode>((ref) {
+  return ThemeModeNotifier(null);
+});
+
+/// 当前生效的 ThemeConfig（根据模式合并配置）
+final effectiveThemeConfigProvider = Provider<ThemeConfig>((ref) {
+  final mode = ref.watch(themeModeProvider);
+  final base = ref.watch(configProvider).theme;
+  if (mode == AppThemeMode.light) {
+    // 用浅色配置覆盖基础配置
+    return lightThemeConfig;
+  }
+  return base;
+});
+
+/// 便捷的 theme provider（兼容旧代码）
+final effectiveThemeProvider = Provider<ThemeConfig>((ref) {
+  return ref.watch(effectiveThemeConfigProvider);
+});
 
 class SubscriptionTier {
   final String level;

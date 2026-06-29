@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/providers/config_provider.dart';
 import '../../data/models/news_item.dart';
 
 /// 新闻评价属性展示组件
@@ -6,12 +7,16 @@ class NewsCardEvaluation extends StatelessWidget {
   final NewsItem news;
   final bool isLocked;
   final bool showAll;
+  final ThemeConfig? theme;
+  final bool isDark;
 
   const NewsCardEvaluation({
     super.key,
     required this.news,
     this.isLocked = false,
     this.showAll = false,
+    this.theme,
+    this.isDark = true,
   });
 
   bool get _hasEvaluation =>
@@ -63,28 +68,31 @@ class NewsCardEvaluation extends StatelessWidget {
 
   /// 完整面板（用于详情弹窗）
   Widget _buildFullPanel() {
+    final textMutedColor = isDark ? Colors.white38 : (theme?.textMutedColor ?? Colors.grey);
+    final textColor = isDark ? Colors.white70 : (theme?.textSecondaryColor ?? Colors.grey);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildInfoRow('方向', _getDirectionLabel(news.direction), Icon(_getDirectionIcon(news.direction), color: _getDirectionColor(news.direction), size: 16)),
-        if (news.intensity != null) _buildInfoRow('强度', _getIntensityLabel(news.intensity!), _buildIntensityIndicator(news.intensity!)),
-        if (news.expectedChange != null) _buildInfoRow('预期变化', news.expectedChange!, null),
-        if (news.duration != null) _buildInfoRow('持续时间', news.duration!, null),
-        if (news.expectationLevel != null) _buildInfoRow('预期程度', news.expectationLevel!, null),
-        if (news.marketMode != null) _buildInfoRow('市场模式', news.marketMode!, null),
-        if (news.maxSectorRise != null) _buildInfoRow('最大涨幅', '${news.maxSectorRise!.toStringAsFixed(2)}%', null),
+        _buildInfoRow('方向', _getDirectionLabel(news.direction), Icon(_getDirectionIcon(news.direction), color: _getDirectionColor(news.direction), size: 16), textMutedColor, textColor),
+        if (news.intensity != null) _buildInfoRow('强度', _getIntensityLabel(news.intensity!), _buildIntensityIndicator(news.intensity!), textMutedColor, textColor),
+        if (news.expectedChange != null) _buildInfoRow('预期变化', news.expectedChange!, null, textMutedColor, textColor),
+        if (news.duration != null) _buildInfoRow('持续时间', news.duration!, null, textMutedColor, textColor),
+        if (news.expectationLevel != null) _buildInfoRow('预期程度', news.expectationLevel!, null, textMutedColor, textColor),
+        if (news.marketMode != null) _buildInfoRow('市场模式', news.marketMode!, null, textMutedColor, textColor),
+        if (news.maxSectorRise != null) _buildInfoRow('最大涨幅', '${news.maxSectorRise!.toStringAsFixed(2)}%', null, textMutedColor, textColor),
       ],
     );
   }
 
-  Widget _buildInfoRow(String label, String value, Widget? trailing) {
+  Widget _buildInfoRow(String label, String value, Widget? trailing, Color labelColor, Color valueColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
           SizedBox(
             width: 72,
-            child: Text(label, style: const TextStyle(color: Colors.white38, fontSize: 13)),
+            child: Text(label, style: TextStyle(color: labelColor, fontSize: 13)),
           ),
           if (trailing != null) ...[
             trailing,
@@ -93,7 +101,7 @@ class NewsCardEvaluation extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
+              style: TextStyle(color: valueColor, fontSize: 14, fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -125,10 +133,13 @@ class NewsCardEvaluation extends StatelessWidget {
   }
 
   Widget _buildIntensityTag(int intensity) {
+    final bgColor = isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05);
+    final textColor = isDark ? Colors.white70 : (theme?.textSecondaryColor ?? Colors.grey);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
+        color: bgColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -138,7 +149,7 @@ class NewsCardEvaluation extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             '强度 ${intensity.toString()}',
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
+            style: TextStyle(color: textColor, fontSize: 12),
           ),
         ],
       ),
@@ -146,7 +157,8 @@ class NewsCardEvaluation extends StatelessWidget {
   }
 
   Widget _buildMaxRiseTag(double maxRise) {
-    final color = const Color(0xFFE53935);
+    final color = theme?.accentRedColor ?? const Color(0xFFE53935);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -178,7 +190,7 @@ class NewsCardEvaluation extends StatelessWidget {
           height: 6,
           margin: const EdgeInsets.only(right: 2),
           decoration: BoxDecoration(
-            color: isFilled ? Colors.amber : Colors.white.withOpacity(0.2),
+            color: isFilled ? Colors.amber : (isDark ? Colors.white.withOpacity(0.2) : Colors.grey.withOpacity(0.2)),
             borderRadius: BorderRadius.circular(3),
           ),
         );

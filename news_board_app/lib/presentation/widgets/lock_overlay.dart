@@ -1,9 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/providers/config_provider.dart';
 
 /// 锁定遮罩层（模糊 + 蒙版 + 订阅提示）
-class LockOverlay extends StatelessWidget {
+class LockOverlay extends ConsumerWidget {
   final bool isLoggedIn;
   final String lockTitle;
   final String lockButtonLoggedIn;
@@ -18,7 +20,15 @@ class LockOverlay extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+    final isDark = themeMode == AppThemeMode.dark;
+
+    // 浅色模式下使用灰色调
+    final overlayColor = isDark ? Colors.black.withOpacity(0.2) : Colors.white.withOpacity(0.5);
+    final iconColor = isDark ? Colors.white70 : Colors.grey[600];
+    final textColor = isDark ? Colors.white70 : Colors.grey[700];
+
     return Positioned.fill(
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
@@ -27,17 +37,17 @@ class LockOverlay extends StatelessWidget {
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.2),
+              color: overlayColor,
               borderRadius: BorderRadius.circular(24),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.lock_outline, color: Colors.white70, size: 36),
+                Icon(Icons.lock_outline, color: iconColor, size: 36),
                 const SizedBox(height: 8),
                 Text(
                   lockTitle,
-                  style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  style: TextStyle(color: textColor, fontSize: 14),
                 ),
                 const SizedBox(height: 12),
                 ElevatedButton(

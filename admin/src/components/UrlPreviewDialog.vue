@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { previewUrlContent } from "../api";
-import { useMobile } from "../composables/useMobile";
 import { Loading } from "@element-plus/icons-vue";
-
-const { isMobile } = useMobile();
 
 const props = defineProps<{
   visible: boolean;

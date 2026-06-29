@@ -3,13 +3,13 @@ REM ================================================================
 REM News Collector - Admin Frontend Deployment Script
 REM ================================================================
 REM
-REM 构建并部署 admin 前端项目到远程服务器
+REM Build and deploy admin frontend project to remote server
 REM
-REM 依赖:
-REM   - .env 中的服务器配置 (SERVER_IP, SERVER_USER, etc.)
-REM   - admin/ 目录下有完整的 Node.js 项目
+REM Dependencies:
+REM   - Server config in .env (SERVER_IP, SERVER_USER, etc.)
+REM   - admin/ directory contains complete Node.js project
 REM
-REM Usage: 双击运行 或 cmd: deploy_admin.bat
+REM Usage: Double-click to run or cmd: deploy_admin.bat
 REM ================================================================
 
 setlocal enabledelayedexpansion
@@ -17,20 +17,20 @@ setlocal enabledelayedexpansion
 set "SCRIPT_DIR=%~dp0"
 set "PROJECT_ROOT=%~dp0.."
 set "ADMIN_DIR=%PROJECT_ROOT%\..\admin"
+set "ENV_FILE=%PROJECT_ROOT%\.env"
 
 REM ================================================================
-REM Server config (from .env)
+REM Load config from .env file
 REM ================================================================
-set "SERVER_IP=39.105.23.221"
-set "SERVER_USER=root"
-set "SERVER_PORT=22"
-set "REMOTE_PATH=/opt/app"
-set "SSH_KEY_PATH=%PROJECT_ROOT%\news_collector.pem"
-set "APP_PORT=31234"
+if exist "!ENV_FILE!" (
+    for /f "usebackq tokens=1,* delims==" %%a in ("!ENV_FILE!") do (
+        set "%%a=%%b"
+    )
+)
 
 REM Check if SSH_KEY exists
-if exist "!SSH_KEY_PATH!" (
-    set "SSH_KEY=!SSH_KEY_PATH!"
+if exist "!SSH_KEY!" (
+    set "SSH_KEY_PATH=!SSH_KEY!"
 )
 
 echo ================================================================
@@ -41,7 +41,7 @@ echo   Remote Path: !REMOTE_PATH!/admin
 echo ================================================================
 
 REM ================================================================
-REM Step 1: 检查 admin 项目
+REM Step 1: Check admin project
 REM ================================================================
 echo.
 echo [1/3] Checking admin project...
@@ -54,7 +54,7 @@ if not exist "!ADMIN_DIR!\package.json" (
 echo [OK] package.json found
 
 REM ================================================================
-REM Step 2: 构建项目
+REM Step 2: Build project
 REM ================================================================
 echo.
 echo [2/3] Building admin project...
@@ -68,15 +68,15 @@ if errorlevel 1 (
 echo [OK] Build complete
 
 REM ================================================================
-REM Step 3: 部署到远程服务器
+REM Step 3: Deploy to remote server
 REM ================================================================
 echo.
 echo [3/3] Deploying to remote server...
 
 REM Build SSH/SCP command
-if defined SSH_KEY (
-    set "SSH_CMD=ssh -p !SERVER_PORT! -i !SSH_KEY! !SERVER_USER!@!SERVER_IP!"
-    set "SCP_FULL=scp -P !SERVER_PORT! -i !SSH_KEY!"
+if defined SSH_KEY_PATH (
+    set "SSH_CMD=ssh -p !SERVER_PORT! -i !SSH_KEY_PATH! !SERVER_USER!@!SERVER_IP!"
+    set "SCP_FULL=scp -P !SERVER_PORT! -i !SSH_KEY_PATH!"
 ) else (
     set "SSH_CMD=ssh -p !SERVER_PORT! !SERVER_USER!@!SERVER_IP!"
     set "SCP_FULL=scp -P !SERVER_PORT!"
@@ -121,7 +121,7 @@ REM Start new service
 echo [OK] Service restarted
 
 REM ================================================================
-REM Step 5: 验证部署
+REM Step 4: Verify deployment
 REM ================================================================
 echo.
 echo [INFO] Verifying deployment...

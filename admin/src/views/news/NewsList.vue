@@ -82,7 +82,7 @@ defineExpose({ refresh });
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item v-for="s in pipelineSteps" :key="s.step" :command="s.step">
-                Step {{ s.step }} - {{ s.desc }}
+                {{ s.step === 0 ? s.desc : `Step ${s.step} - ${s.desc}` }}
               </el-dropdown-item>
             </el-dropdown-menu>
           </template>
@@ -112,7 +112,7 @@ defineExpose({ refresh });
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item v-for="s in pipelineSteps" :key="s.step" :command="s.step">
-                  Step {{ s.step }} - {{ s.desc }}
+                  {{ s.step === 0 ? s.desc : `Step ${s.step} - ${s.desc}` }}
                 </el-dropdown-item>
               </el-dropdown-menu>
             </template>

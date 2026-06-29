@@ -21,6 +21,9 @@ export const markUseful = (id: number, useful: boolean) =>
 export const runPipelineStep = (step: number) =>
   api.post("/api/news/pipeline/step", null, { params: { step } });
 
+export const runPipelineFull = () =>
+  api.post("/api/news/pipeline/run");
+
 // 数据源学习/抓取（与 news 流水线相关）
 export const learnSource = (params: { url: string; name?: string; headline?: string; skip_article?: boolean; force_relearn?: boolean }) =>
   api.get("/api/news/learn", { params });

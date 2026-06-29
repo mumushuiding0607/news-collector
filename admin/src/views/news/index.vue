@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { ElMessageBox } from "element-plus";
-import { MoreFilled } from "@element-plus/icons-vue";
 import NewsList from "./NewsList.vue";
 import NewsSummary from "./NewsSummary.vue";
 import { pipelineSteps } from "./pipelineConfig";
-import { runPipelineStep } from "../../api";
+import { runPipelineStep, runPipelineFull } from "../../api";
 import NewsDetail from "../../components/NewsDetail.vue";
 import LogViewer from "../../components/LogViewer.vue";
 import type { TabType } from "./types";
@@ -20,8 +19,6 @@ const logVisible = ref(false);
 const logTitle = ref("");
 const logFile = ref("");
 
-const newsListRef = ref<InstanceType<typeof NewsList> | null>(null);
-
 async function handlePipelineStep(step: number, desc: string) {
   try {
     await ElMessageBox.confirm(`确认执行「${desc}」？`, "确认执行", { type: "info" });
@@ -33,7 +30,11 @@ async function handlePipelineStep(step: number, desc: string) {
   logFile.value = `${cfg?.logFile}.log`;
   logVisible.value = true;
   try {
-    await runPipelineStep(step);
+    if (step === 0) {
+      await runPipelineFull();
+    } else {
+      await runPipelineStep(step);
+    }
   } catch {
     // interceptor shows popup
   }
@@ -62,7 +63,6 @@ function onTabChange(tab: string | number) {
 
     <NewsList
       v-if="activeTab !== 'summary'"
-      ref="newsListRef"
       :tab="activeTab as 'importance' | 'primary'"
       :pipeline-steps="activeTab === 'importance' ? pipelineSteps : []"
       @open-pipeline="handlePipelineStep"

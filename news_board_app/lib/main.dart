@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/providers/config_provider.dart' show ApiConfig, configProvider, ThemeConfig;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'core/providers/config_provider.dart';
 import 'core/providers/version_provider.dart';
 import 'core/router/app_router.dart';
 import 'core/providers/subscription_provider.dart';
 
+late SharedPreferences gPrefs;
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  gPrefs = await SharedPreferences.getInstance();
 
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
@@ -19,7 +24,15 @@ void main() async {
   // 在 runApp 前加载 API 配置，确保任何请求发出前配置已就绪
   await ApiConfig.loadFromConfig();
 
-  runApp(const ProviderScope(child: NewsBoardApp()));
+  runApp(ProviderScope(
+    overrides: [
+      themeModeProvider.overrideWith((ref) {
+        ref.onDispose(() {});
+        return ThemeModeNotifier(gPrefs);
+      }),
+    ],
+    child: const NewsBoardApp(),
+  ));
 }
 
 class NewsBoardApp extends ConsumerStatefulWidget {
@@ -80,7 +93,8 @@ class _NewsBoardAppState extends ConsumerState<NewsBoardApp> with WidgetsBinding
   @override
   Widget build(BuildContext context) {
     final config = ref.watch(configProvider);
-    final theme = config.theme;
+    final theme = ref.watch(effectiveThemeConfigProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     // 监听版本检查结果，弹出更新提示（延迟10秒确保UI已就绪）
     ref.listen<VersionCheckResult>(versionProvider, (prev, next) {
@@ -97,14 +111,14 @@ class _NewsBoardAppState extends ConsumerState<NewsBoardApp> with WidgetsBinding
     return MaterialApp.router(
       title: config.appName,
       debugShowCheckedModeBanner: false,
-      theme: _buildTheme(theme),
+      theme: _buildTheme(theme, themeMode),
       routerConfig: appRouter,
     );
   }
 
-  ThemeData _buildTheme(ThemeConfig theme) {
+  ThemeData _buildTheme(ThemeConfig theme, AppThemeMode mode) {
     return ThemeData(
-      brightness: Brightness.dark,
+      brightness: mode == AppThemeMode.dark ? Brightness.dark : Brightness.light,
       scaffoldBackgroundColor: theme.backgroundStartColor,
       primaryColor: theme.accentRedColor,
       appBarTheme: AppBarTheme(
@@ -118,14 +132,23 @@ class _NewsBoardAppState extends ConsumerState<NewsBoardApp> with WidgetsBinding
         ),
         iconTheme: IconThemeData(color: theme.textPrimaryColor),
       ),
-      colorScheme: ColorScheme.dark(
-        primary: theme.accentRedColor,
-        secondary: theme.accentGoldColor,
-        surface: theme.backgroundStartColor,
-        onPrimary: Colors.white,
-        onSecondary: Colors.black,
-        onSurface: theme.textPrimaryColor,
-      ),
+      colorScheme: mode == AppThemeMode.dark
+          ? ColorScheme.dark(
+              primary: theme.accentRedColor,
+              secondary: theme.accentGoldColor,
+              surface: theme.backgroundStartColor,
+              onPrimary: Colors.white,
+              onSecondary: Colors.black,
+              onSurface: theme.textPrimaryColor,
+            )
+          : ColorScheme.light(
+              primary: theme.accentRedColor,
+              secondary: theme.accentGoldColor,
+              surface: theme.backgroundStartColor,
+              onPrimary: Colors.white,
+              onSecondary: Colors.black,
+              onSurface: theme.textPrimaryColor,
+            ),
       textTheme: TextTheme(
         headlineLarge: TextStyle(
           color: theme.textPrimaryColor,

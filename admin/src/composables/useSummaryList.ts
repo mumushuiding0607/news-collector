@@ -26,7 +26,7 @@ export function useSummaryList(type: string) {
   }
 
   async function openDetail(date: string) {
-    const res = (await getSummaryByDate(date, type)) as Record<string, unknown>;
+    const res = (await getSummaryByDate(date, type)) as unknown as Record<string, unknown>;
     detail.value = res || {};
     detailVisible.value = true;
   }

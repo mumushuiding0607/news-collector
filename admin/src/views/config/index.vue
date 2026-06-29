@@ -28,8 +28,8 @@ async function fetchConfig() {
   loading.value = true;
   try {
     const [appData, envData] = await Promise.all([
-      getAppConfig() as Promise<Record<string, unknown>>,
-      getEnvConfig() as Promise<Record<string, unknown>>,
+      getAppConfig() as unknown as Promise<Record<string, unknown>>,
+      getEnvConfig() as unknown as Promise<Record<string, unknown>>,
     ]);
     appConfig.value = appData;
     envConfig.value = envData;

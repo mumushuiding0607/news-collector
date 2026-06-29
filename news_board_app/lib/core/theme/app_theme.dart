@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/config_provider.dart';
 
-/// 动态主题 - 从 backend config.json 读取
+/// 动态主题 - 支持暗黑/明亮模式切换
 class AppTheme {
   AppTheme._();
 
   static ThemeConfig of(BuildContext context) {
-    return context.read(themeProvider);
+    return context.read(effectiveThemeConfigProvider);
   }
 
   static Color getScoreColor(BuildContext context, int score) {

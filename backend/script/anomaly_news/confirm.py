@@ -5,7 +5,7 @@ anomaly_news/confirm.py - 确认异动消息中的数据源
 """
 from script.log import log as _log, init_log
 from script.db.anomaly_news import get_anomaly_news, mark_processed
-from script.db.sources_db import upsert_crawl_config, get_crawl_config_by_name
+from script.db.sources_db import upsert_crawl_config, get_crawl_config_by_name, get_crawl_config_by_domain, extract_domain
 from script.llm import call_async_raw
 
 
@@ -142,17 +142,41 @@ def confirm_sources(dry_run: bool = False) -> dict:
 
     if not dry_run:
         saved = 0
+        skipped_domain = 0
         for r in valid_results:
-            upsert_crawl_config(url=r["url"], name=r["source_name"], checked=0)
-            saved += 1
-        log(f"已保存 {saved} 条到 source_crawl_configs")
+            domain = extract_domain(r["url"])
+            # 先按名称查，再按域名查
+            existing_by_name = get_crawl_config_by_name(r["source_name"])
+            existing_by_domain = get_crawl_config_by_domain(domain) if domain else None
+            if existing_by_name is not None:
+                log(f"跳过（名称已存在）: {r['source_name']}")
+            elif existing_by_domain is not None:
+                log(f"跳过（域名已存在）: {domain} (来源: {existing_by_domain.get('name', '未知')})")
+                skipped_domain += 1
+            else:
+                upsert_crawl_config(url=r["url"], name=r["source_name"], checked=0)
+                saved += 1
+        log(f"已保存 {saved} 条，跳过（域名重复）{skipped_domain} 条")
         # 标记 anomaly_news 为已处理
         for r in records:
             mark_processed(r[0])
         log(f"已标记 {len(records)} 条异动消息为已处理")
     else:
         saved = 0
-        log(f"[DRY-RUN] 跳过保存，共 {len(valid_results)} 条待确认")
+        skipped_domain = 0
+        for r in valid_results:
+            domain = extract_domain(r["url"])
+            existing_by_name = get_crawl_config_by_name(r["source_name"])
+            existing_by_domain = get_crawl_config_by_domain(domain) if domain else None
+            if existing_by_name is not None:
+                log(f"[DRY-RUN] 跳过（名称已存在）: {r['source_name']}")
+            elif existing_by_domain is not None:
+                log(f"[DRY-RUN] 跳过（域名已存在）: {domain}")
+                skipped_domain += 1
+            else:
+                log(f"[DRY-RUN] 待保存: {r['source_name']} -> {r['url']}")
+                saved += 1
+        log(f"[DRY-RUN] 共 {len(valid_results)} 条，待保存 {saved} 条，域名重复 {skipped_domain} 条")
 
     return {
         "total": len(unique_sources),

@@ -791,6 +791,20 @@ _PIPELINE_STEPS = {
 }
 
 
+@router.post("/news/pipeline/run")
+def run_pipeline_full(request: Request):
+    """
+    触发新闻流水线完整流程（异步，后台执行）：step 1 → 最后一步。
+    """
+    def _run():
+        from service.news_pipeline import run_pipeline
+        run_pipeline(start_step=1, end_step=None)
+
+    import threading
+    threading.Thread(target=_run, daemon=True).start()
+    return {"ok": True, "message": "完整流程已触发"}
+
+
 @router.post("/news/pipeline/step")
 def run_pipeline_step(request: Request, step: int = Query(..., ge=1, le=7)):
     """

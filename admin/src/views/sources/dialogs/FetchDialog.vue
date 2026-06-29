@@ -32,7 +32,7 @@ async function handleSubmit() {
   }
   loading.value = true;
   try {
-    const result = (await fetchSourceNews({ url: form.value.url, limit: form.value.limit })) as Record<string, unknown>;
+    const result = (await fetchSourceNews({ url: form.value.url, limit: form.value.limit })) as unknown as Record<string, unknown>;
     const news = (result.news as Record<string, unknown>[]) || [];
     emit("fetched", {
       url: form.value.url,

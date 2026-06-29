@@ -63,12 +63,6 @@ function openAnomaly(row: Record<string, unknown>) {
   anomalyVisible.value = true;
 }
 
-function onTaskStarted(payload: { sourceName: string; logFile: string }) {
-  logViewerTitle.value = `抓取日志 - ${payload.sourceName}`;
-  logViewerFile.value = payload.logFile;
-  logViewerVisible.value = true;
-}
-
 function onLearnStarted(payload: { sourceName: string; logFile: string }) {
   logViewerTitle.value = `学习日志 - ${payload.sourceName}`;
   logViewerFile.value = payload.logFile;

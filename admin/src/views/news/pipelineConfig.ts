@@ -1,5 +1,6 @@
 // 新闻采集 pipeline 步骤定义（与后端 backend/main.py 中注册的 step 对应）
 export const pipelineSteps = [
+  { step: 0, name: "full", desc: "完整执行", logFile: "news_pipeline" },
   { step: 1, name: "list_crawler", desc: "采集新闻列表", logFile: "list_crawler" },
   { step: 2, name: "news_filter", desc: "LLM过滤", logFile: "news_filter" },
   { step: 3, name: "article_crawler", desc: "采集文章正文", logFile: "article_crawler" },

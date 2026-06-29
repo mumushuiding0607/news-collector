@@ -99,7 +99,7 @@ onMounted(fetchUsers);
         </div>
         <div
           v-for="row in tableData"
-          :key="row.id"
+          :key="(row.id as string | number)"
           style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 12px"
         >
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px">
