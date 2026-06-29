@@ -28,7 +28,7 @@ PROMPT_PATH = Path(__file__).parent.parent.parent / "prompt" / "新闻列表发�
 PROMPT_TEMPLATE = PROMPT_PATH.read_text(encoding="utf-8")
 
 
-def discover_list_config(url: str, html: str, use_raw_fallback: bool = True, headline: str = "", already_cleaned: bool = False) -> dict:
+def discover_list_config(url: str, html: str, use_raw_fallback: bool = True, headline: str = "", already_cleaned: bool = False, force_relearn: bool = False) -> dict:
     """
     发现新闻列表配置。
 
@@ -54,7 +54,7 @@ def discover_list_config(url: str, html: str, use_raw_fallback: bool = True, hea
         log("[Step 1] 跳过 clean_html（输入已清洗）")
         # 已清洗的 HTML 可能已不含 <script>（clean_html 删掉了）。
         # 检测 __NEXT_DATA__ 需要原始 HTML，尝试 raw_fetch 补获。
-        if "__NEXT_DATA__" not in html:
+        if "__NEXT_DATA__" not in html and not force_relearn:
             from script.discovery.raw_fetch import fetch_raw_html
             raw = fetch_raw_html(url)
             if raw and "__NEXT_DATA__" in raw:
@@ -63,7 +63,8 @@ def discover_list_config(url: str, html: str, use_raw_fallback: bool = True, hea
     else:
         # __NEXT_DATA__ 嵌入式 JSON 站点（Next.js）：clean_html 会删掉 <script> 标签，
         # 导致 HTML 变空。优先在 clean 之前检测并走 raw_fetch 路径。
-        if "__NEXT_DATA__" in html:
+        # 但 force_relearn=True 时跳过此快捷路径，强制走 HTML+LLM 分析。
+        if "__NEXT_DATA__" in html and not force_relearn:
             log("[Step 1] 检测到 __NEXT_DATA__，跳过 LLM HTML 分析，直接用 embedded JSON")
             return _discover_with_raw_fetch(url)
         cleaned = clean_html(html)

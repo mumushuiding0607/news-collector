@@ -44,7 +44,7 @@ def discover_list_with_policy(
     # force_relearn=True 时，不回退到现有配置
     if force_relearn:
         log("[Step 1.2/2] force_relearn=True，不回退到现有配置")
-        list_config, source_type, method = _run_list_discovery(url, list_html, headline)
+        list_config, source_type, method = _run_list_discovery(url, list_html, headline, force_relearn=True)
         if list_config is None:
             log("[统一学习] HTML LLM 学习失败，force_relearn=True，不保留已有配置")
             # 返回 None，让 save_learned_config 失败
@@ -56,7 +56,7 @@ def discover_list_with_policy(
         existing_type = existing_list_config.get("type") if isinstance(existing_list_config, dict) else None
         if existing_type in OBSOLETE_LIST_TYPES:
             log(f"[Step 1.2/2] 已有配置 type={existing_type}，不再保留，强制重新学习")
-            return _run_list_discovery(url, list_html, headline)
+            return _run_list_discovery(url, list_html, headline, force_relearn=True)
 
         log(f"[Step 1.2/2] 已有配置 type={existing_type}，尝试学习是否有更好配置...")
         list_config, source_type, method = _run_list_discovery(url, list_html, headline)
@@ -73,9 +73,9 @@ def discover_list_with_policy(
     return list_config, source_type, method
 
 
-def _run_list_discovery(url: str, list_html: str, headline: str) -> tuple[dict | None, str | None, str | None]:
+def _run_list_discovery(url: str, list_html: str, headline: str, force_relearn: bool = False) -> tuple[dict | None, str | None, str | None]:
     """调用 discover_list_config 并解析 discovery_method"""
-    discovered = discover_list_config(url, list_html, use_raw_fallback=True, headline=headline)
+    discovered = discover_list_config(url, list_html, use_raw_fallback=True, headline=headline, force_relearn=force_relearn)
     if not discovered:
         return None, None, "学习失败"
 

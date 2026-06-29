@@ -166,85 +166,74 @@ echo ================================================================
 echo [OK] Directory created
 
 REM ================================================================
-REM Step 2: Check requirements diff (incremental pip install)
+REM Step 2: Upload requirements.txt
 REM ================================================================
 echo.
 echo ================================================================
-echo   Step 2: Check Python Dependencies
+echo   Step 2: Upload requirements.txt
 echo ================================================================
-!SSH_FULL! "if [ ! -f '%REMOTE_PATH%/requirements.txt' ]; then echo 'FIRST-DEPLOY'; else echo 'EXISTS'; fi" > "%TEMP%\_deploy_check.txt"
-set /p _CHECK_RESULT=<"%TEMP%\_deploy_check.txt"
-del "%TEMP%\_deploy_check.txt"
+!SCP_FULL! "%PROJECT_ROOT%\backend\requirements.txt" %SERVER_USER%@!SERVER_IP!:%REMOTE_PATH%/requirements.txt
+echo [OK] requirements.txt uploaded
 
-if "!_CHECK_RESULT!"=="FIRST-DEPLOY" (
-    echo [INFO] First deployment - will install all dependencies
-    set "PIP_ACTION=FULL"
-) else (
-    echo [INFO] Existing deployment - incremental install
-    set "PIP_ACTION=INCREMENTAL"
+REM ================================================================
+REM Step 3: Install Python dependencies
+REM ================================================================
+echo.
+echo ================================================================
+echo   Step 3: Install Python Dependencies
+echo ================================================================
+echo [INFO] Remove system python3-rich (blocks pip)...
+!SSH_FULL! "apt-get remove -y python3-rich 2>/dev/null || true"
+echo [INFO] Installing packages...
+!SSH_FULL! "cd '%REMOTE_PATH%' && LC_ALL=C python3 -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/ --no-cache-dir --break-system-packages --ignore-installed"
+if errorlevel 1 (
+    echo [ERROR] pip install failed, please check the error above
+    exit /b 1
 )
+echo [OK] Dependencies installed
+
+echo.
+echo ================================================================
+echo   Step 3b: Install Playwright Browsers
+echo ================================================================
+!SSH_FULL! "if [ -d '/root/.cache/ms-playwright' ]; then cd '%REMOTE_PATH%' && python3 -m playwright install chromium; fi"
+echo [OK] Playwright check complete
 
 REM ================================================================
-REM Step 3: Upload project files
+REM Step 4: Upload project files
 REM ================================================================
 echo.
 echo ================================================================
-echo   Step 3: Upload Project Files
+echo   Step 4: Upload Project Files
 echo ================================================================
 
 echo [INFO] Uploading .env...
 if exist "%PROJECT_ROOT%\backend\.env" (
-    !SCP_FULL! "%PROJECT_ROOT%\backend\.env" %SERVER_USER%@%SERVER_IP%:%REMOTE_PATH%/backend/.env
+    !SCP_FULL! "%PROJECT_ROOT%\backend\.env" %SERVER_USER%@!SERVER_IP!:%REMOTE_PATH%/backend/.env
 )
 
-echo [INFO] Uploading requirements.txt...
-!SCP_FULL! "%PROJECT_ROOT%\backend\requirements.txt" %SERVER_USER%@%SERVER_IP%:%REMOTE_PATH%/requirements.txt
-
 echo [INFO] Uploading backend directory...
-!SCP_FULL! -r "%PROJECT_ROOT%\backend" %SERVER_USER%@%SERVER_IP%:%REMOTE_PATH%
+!SCP_FULL! -r "%PROJECT_ROOT%\backend" %SERVER_USER%@!SERVER_IP!:%REMOTE_PATH%
 
 echo [OK] Upload complete
 
+echo.
+echo ================================================================
+echo   Step 4b: Stop old services
+echo ================================================================
+!SSH_FULL! "pkill -f 'uvicorn backend.main:app' 2>/dev/null || true; pkill -f 'run_scheduler' 2>/dev/null || true; echo 'old processes stopped'"
+echo [OK] Old services stopped
+
 REM ================================================================
-REM Step 4: Python dependencies install
+REM Step 5-7: Start services
 REM ================================================================
 echo.
 echo ================================================================
-echo   Step 4: Install Python Dependencies
+echo   Step 5-7: Start Backend and Scheduler
 echo ================================================================
-
-if "!PIP_ACTION!"=="SKIP" (
-    echo [SKIP] No changes - skipping pip install
-) else (
-    echo [INFO] Removing crawl4ai from remote requirements.txt...
-    for /f "tokens=*" %%a in ('!SSH_FULL! "sed -i '/^crawl4ai/d' '%REMOTE_PATH%'/requirements.txt" 2^>nul') do rem
-    echo [INFO] Installing packages...
-    for /f "tokens=*" %%a in ('!SSH_FULL! "cd '%REMOTE_PATH%' ^&^& LC_ALL=C python3 -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/ --no-cache-dir --break-system-packages" 2^>nul') do rem
-    echo [INFO] Installing crawl4ai with --no-deps...
-    for /f "tokens=*" %%a in ('!SSH_FULL! "cd '%REMOTE_PATH%' ^&^& LC_ALL=C python3 -m pip install crawl4ai --no-deps -i https://pypi.tuna.tsinghua.edu.cn/simple/ --no-cache-dir --break-system-packages" 2^>nul') do rem
-    echo [OK] Dependencies installed
-)
-
-echo.
-echo ================================================================
-echo   Step 4b: Install Playwright Browsers
-echo ================================================================
-for /f "tokens=*" %%a in ('!SSH_FULL! "if [ ! -d '/root/.cache/ms-playwright' ]; then cd '%REMOTE_PATH%' && python3 -m playwright install chromium > /dev/null 2>&1; fi" 2^>nul') do rem
-echo [OK] Playwright check complete
-
-REM ================================================================
-REM ================================================================
-REM Step 5-7: Stop, Start and Health Check (via remote script)
-REM ================================================================
-echo.
-echo ================================================================
-echo   Step 5-7: Stop, Start and Health Check (via remote script)
-echo ================================================================
-echo [INFO] Uploading remote deployment script...
-!SCP_FULL! "%DEPLOY_DIR%_deploy_remote.py" "!SERVER_USER!@!SERVER_IP!:/tmp/_deploy_remote.py"
-
-echo [INFO] Running remote deployment script...
-!SSH_FULL! "REMOTE_PATH='%REMOTE_PATH%' python3 /tmp/_deploy_remote.py deploy"
+!SSH_FULL! "cd '%REMOTE_PATH%' && nohup python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 31234 > /var/log/news_collector.log 2>&1 &"
+!SSH_FULL! "cd '%REMOTE_PATH%' && nohup python3 run_scheduler.py > /var/log/news_scheduler.log 2>&1 &"
+!SSH_FULL! "sleep 3 && curl -s http://localhost:31234/api/health && echo '[OK] Backend is running' || echo '[ERROR] Backend not responding'"
 
 echo.
 echo ================================================================

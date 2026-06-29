@@ -59,6 +59,14 @@ REM ================================================================
 echo.
 echo [2/3] Building admin project...
 
+REM Check if npm is available
+where npm >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] npm not found. Please install Node.js and npm first.
+    echo [INFO] Download from: https://nodejs.org/
+    exit /b 1
+)
+
 cd /d "!ADMIN_DIR!"
 call npm run build 2>nul
 if errorlevel 1 (
@@ -93,30 +101,51 @@ if not exist "!BUILD_SRC!" (
     exit /b 1
 )
 
-REM Create remote directory if not exists
+REM Create remote directory (clean) and upload build files
 echo [INFO] Creating remote directory...
-!SSH_CMD! "mkdir -p !REMOTE_PATH!/admin"
+!SSH_CMD! "rm -rf !REMOTE_PATH!/admin && mkdir -p !REMOTE_PATH!"
 
-echo [INFO] Uploading build files...
-!SCP_FULL! -r "!BUILD_SRC!" "!BUILD_DST!" 2>nul
+echo [INFO] Uploading build files to temp location...
+!SCP_FULL! -r "!BUILD_SRC!" "!SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/admin_dist" 2>nul
 if errorlevel 1 (
     echo [ERROR] Upload failed
     exit /b 1
 )
-echo [OK] Files uploaded
+echo [INFO] Arranging files...
+!SSH_CMD! "mv !REMOTE_PATH!/admin_dist !REMOTE_PATH!/admin"
+echo [OK] Files uploaded"
 
 REM Restart PM2 service
 echo.
-echo [INFO] Restarting admin service...
+echo [INFO] Checking remote Node.js environment...
+
+REM Check if npm is available on remote server
+!SSH_CMD! "command -v npm >/dev/null 2>&1"
+if errorlevel 1 (
+    echo [WARN] npm not found on remote server, attempting to install Node.js...
+    !SSH_CMD! "curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs"
+    if errorlevel 1 (
+        echo [ERROR] Node.js installation failed. Please install Node.js on the server manually.
+        exit /b 1
+    )
+    echo [OK] Node.js installed
+) else (
+    echo [OK] Remote npm found
+)
 
 REM Check and install PM2 if needed
 !SSH_CMD! "command -v pm2 >/dev/null 2>&1 || npm install -g pm2"
+if errorlevel 1 (
+    echo [ERROR] PM2 installation failed
+    exit /b 1
+)
+echo [OK] PM2 ready
 
 REM Stop and delete existing service (ignore errors)
 !SSH_CMD! "pm2 stop admin-web 2>/dev/null; pm2 delete admin-web 2>/dev/null; true"
 
 REM Start new service
-!SSH_CMD! "pm2 serve /opt/app/admin/dist --name admin-web --port 5173"
+!SSH_CMD! "pm2 serve /opt/app/admin/dist --name admin-web --port 5173 --spa"
 
 echo [OK] Service restarted
 

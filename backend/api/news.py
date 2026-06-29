@@ -430,18 +430,37 @@ async def fetch_news_by_url(request: Request, url: str, limit: int = 10):
         from script.discovery.embedded_json import find_embedded_json, extract_news_items
         _log("fetch", f"[Fetch] Raw类型抓取: {url}")
         raw_html = fetch_raw_html(url)
-        if raw_html:
-            json_data = find_embedded_json(raw_html)
-            if json_data:
-                news_items = extract_news_items(
-                    json_data,
-                    url_field=list_config.get("url_field", "url"),
-                    title_field=list_config.get("title_field", "title"),
-                    time_field=list_config.get("time_field", "createTime"),
-                    summary_field=list_config.get("summary_field", "summary"),
-                    date_format=list_config.get("date_format"),
-                )
-                _log("fetch", f"[Fetch] Raw解析完成，获取 {len(news_items)} 条")
+        if not raw_html:
+            _log("fetch", f"[Fetch] Raw抓取失败，HTML为空")
+            raise HTTPException(status_code=500, detail="页面抓取失败")
+
+        json_data = find_embedded_json(raw_html)
+        if not json_data:
+            _log("fetch", f"[Fetch] Raw解析失败，未找到嵌入式JSON")
+            raise HTTPException(status_code=500, detail="页面嵌入式JSON解析失败")
+
+        # 诊断：检查JSON结构是否匹配配置的字段
+        url_field = list_config.get("url_field", "url")
+        title_field = list_config.get("title_field", "title")
+        _log("fetch", f"[Fetch] Raw JSON类型: {type(json_data).__name__}, 期望字段: url={url_field}, title={title_field}")
+
+        if isinstance(json_data, dict):
+            # 检测是否为JS渲染框架的空壳数据（如Next.js __NEXT_DATA__）
+            if "props" in json_data or "pageProps" in json_data:
+                _log("fetch", f"[Fetch] Raw警告: JSON来自JS渲染框架(Next.js)，内容可能为空，建议改用html类型")
+            # 检查配置的字段是否存在
+            first_level_keys = list(json_data.keys())[:10]
+            _log("fetch", f"[Fetch] Raw JSON顶层keys: {first_level_keys}")
+
+        news_items = extract_news_items(
+            json_data,
+            url_field=url_field,
+            title_field=title_field,
+            time_field=list_config.get("time_field", "createTime"),
+            summary_field=list_config.get("summary_field", "summary"),
+            date_format=list_config.get("date_format"),
+        )
+        _log("fetch", f"[Fetch] Raw解析完成，获取 {len(news_items)} 条")
     elif source_type == "api":
         # API 类型：调用 API（不写入数据库）
         _log("fetch", f"[Fetch] API类型抓取: {url}")
@@ -458,12 +477,15 @@ async def fetch_news_by_url(request: Request, url: str, limit: int = 10):
             raise HTTPException(status_code=500, detail="页面抓取失败")
 
         name = src.get("name") or url
+        _log("fetch", f"[Fetch] HTML提取配置: {list_config.get('type')}, list_complete={list_config.get('list_complete')}")
         news_items = extract_list_articles(html, markdown, name, list_config, url)
         _log("fetch", f"[Fetch] HTML解析获取 {len(news_items)} 条")
 
     if not news_items:
-        _log("fetch", f"[Fetch] 未获取到新闻: {url}")
-        raise HTTPException(status_code=404, detail="未获取到新闻")
+        _log("fetch", f"[Fetch] 未获取到任何新闻: {url}, 类型={source_type}")
+        if source_type == "raw":
+            raise HTTPException(status_code=404, detail="Raw类型解析结果为空，可能需要重新学习并选用html类型")
+        raise HTTPException(status_code=404, detail="未获取到新闻，请检查数据源配置")
 
     # 按 list_crawler 格式输出每条新闻
     for item in news_items:
