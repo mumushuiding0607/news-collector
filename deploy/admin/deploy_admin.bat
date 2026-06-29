@@ -15,9 +15,9 @@ REM ================================================================
 setlocal enabledelayedexpansion
 
 set "SCRIPT_DIR=%~dp0"
-set "PROJECT_ROOT=%~dp0.."
-set "ADMIN_DIR=%PROJECT_ROOT%\..\admin"
-set "ENV_FILE=%PROJECT_ROOT%\.env"
+set "PROJECT_ROOT=%~dp0..\.."
+set "ADMIN_DIR=%PROJECT_ROOT%\admin"
+set "ENV_FILE=%PROJECT_ROOT%\deploy\.env"
 
 REM ================================================================
 REM Load config from .env file
@@ -28,9 +28,12 @@ if exist "!ENV_FILE!" (
     )
 )
 
-REM Check if SSH_KEY exists
-if exist "!SSH_KEY!" (
-    set "SSH_KEY_PATH=!SSH_KEY!"
+REM ================================================================
+REM Resolve SSH key path (absolute from project root)
+REM SSH_KEY is relative to deploy/ directory, key is in project root
+REM ================================================================
+if defined SSH_KEY (
+    set "SSH_KEY_ABS=%PROJECT_ROOT%\news_collector.pem"
 )
 
 echo ================================================================
@@ -38,6 +41,7 @@ echo   Admin Frontend Deployment
 echo ================================================================
 echo   Server: !SERVER_USER!@!SERVER_IP!:!SERVER_PORT!
 echo   Remote Path: !REMOTE_PATH!/admin
+if defined SSH_KEY_ABS echo   SSH Key: !SSH_KEY_ABS!
 echo ================================================================
 
 REM ================================================================
@@ -81,49 +85,51 @@ REM ================================================================
 echo.
 echo [3/3] Deploying to remote server...
 
-REM Build SSH/SCP command
-if defined SSH_KEY_PATH (
-    set "SSH_CMD=ssh -p !SERVER_PORT! -i !SSH_KEY_PATH! !SERVER_USER!@!SERVER_IP!"
-    set "SCP_FULL=scp -P !SERVER_PORT! -i !SSH_KEY_PATH!"
-) else (
-    set "SSH_CMD=ssh -p !SERVER_PORT! !SERVER_USER!@!SERVER_IP!"
-    set "SCP_FULL=scp -P !SERVER_PORT!"
-)
-
-REM Upload build directory
-set "BUILD_SRC=!ADMIN_DIR!\dist"
-set "BUILD_DST=!SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/admin"
-
 REM Check local build output exists
-if not exist "!BUILD_SRC!" (
-    echo [ERROR] Build output not found: !BUILD_SRC!
+if not exist "!ADMIN_DIR!\dist" (
+    echo [ERROR] Build output not found: !ADMIN_DIR!\dist
     echo [INFO] Please check your build process
     exit /b 1
 )
 
-REM Create remote directory (clean) and upload build files
-echo [INFO] Creating remote directory...
-!SSH_CMD! "rm -rf !REMOTE_PATH!/admin && mkdir -p !REMOTE_PATH!"
+REM Create remote directory (clean)
+echo [INFO] Cleaning remote directory...
+if defined SSH_KEY_ABS (
+    bash -c "ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! 'rm -rf !REMOTE_PATH!/admin/*'"
+) else (
+    bash -c "ssh -p !SERVER_PORT! !SERVER_USER!@!SERVER_IP! 'rm -rf !REMOTE_PATH!/admin/*'"
+)
 
-echo [INFO] Uploading build files to temp location...
-!SCP_FULL! -r "!BUILD_SRC!" "!SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/admin_dist" 2>nul
+REM Upload build files
+echo [INFO] Uploading build files...
+if defined SSH_KEY_ABS (
+    bash -c "scp -P !SERVER_PORT! -i '!SSH_KEY_ABS!' -r '!ADMIN_DIR!\dist'/* !SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/admin/"
+) else (
+    bash -c "scp -P !SERVER_PORT! -r '!ADMIN_DIR!\dist'/* !SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/admin/"
+)
 if errorlevel 1 (
     echo [ERROR] Upload failed
     exit /b 1
 )
-echo [INFO] Arranging files...
-!SSH_CMD! "mv !REMOTE_PATH!/admin_dist !REMOTE_PATH!/admin"
-echo [OK] Files uploaded"
+echo [OK] Files uploaded
 
 REM Restart PM2 service
 echo.
 echo [INFO] Checking remote Node.js environment...
 
 REM Check if npm is available on remote server
-!SSH_CMD! "command -v npm >/dev/null 2>&1"
+if defined SSH_KEY_ABS (
+    bash -c "ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! 'command -v npm'"
+) else (
+    bash -c "ssh -p !SERVER_PORT! !SERVER_USER!@!SERVER_IP! 'command -v npm'"
+)
 if errorlevel 1 (
     echo [WARN] npm not found on remote server, attempting to install Node.js...
-    !SSH_CMD! "curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs"
+    if defined SSH_KEY_ABS (
+        bash -c "ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! 'curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs'"
+    ) else (
+        bash -c "ssh -p !SERVER_PORT! !SERVER_USER!@!SERVER_IP! 'curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs'"
+    )
     if errorlevel 1 (
         echo [ERROR] Node.js installation failed. Please install Node.js on the server manually.
         exit /b 1
@@ -134,7 +140,11 @@ if errorlevel 1 (
 )
 
 REM Check and install PM2 if needed
-!SSH_CMD! "command -v pm2 >/dev/null 2>&1 || npm install -g pm2"
+if defined SSH_KEY_ABS (
+    bash -c "ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! 'command -v pm2 || npm install -g pm2'"
+) else (
+    bash -c "ssh -p !SERVER_PORT! !SERVER_USER!@!SERVER_IP! 'command -v pm2 || npm install -g pm2'"
+)
 if errorlevel 1 (
     echo [ERROR] PM2 installation failed
     exit /b 1
@@ -142,11 +152,18 @@ if errorlevel 1 (
 echo [OK] PM2 ready
 
 REM Stop and delete existing service (ignore errors)
-!SSH_CMD! "pm2 stop admin-web 2>/dev/null; pm2 delete admin-web 2>/dev/null; true"
+if defined SSH_KEY_ABS (
+    bash -c "ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! 'pm2 stop admin-web 2>/dev/null; pm2 delete admin-web 2>/dev/null; true'"
+) else (
+    bash -c "ssh -p !SERVER_PORT! !SERVER_USER!@!SERVER_IP! 'pm2 stop admin-web 2>/dev/null; pm2 delete admin-web 2>/dev/null; true'"
+)
 
-REM Start new service
-!SSH_CMD! "pm2 serve /opt/app/admin/dist --name admin-web --port 5173 --spa"
-
+REM Start new service (SPA mode for Vue router)
+if defined SSH_KEY_ABS (
+    bash -c "ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! 'pm2 serve /opt/app/admin --name admin-web --port 5173 --spa'"
+) else (
+    bash -c "ssh -p !SERVER_PORT! !SERVER_USER!@!SERVER_IP! 'pm2 serve /opt/app/admin --name admin-web --port 5173 --spa'"
+)
 echo [OK] Service restarted
 
 REM ================================================================
