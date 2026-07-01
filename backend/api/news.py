@@ -810,6 +810,7 @@ _PIPELINE_STEPS = {
     5: ("findStocks", "核心标的发现", "find_stocks"),
     6: ("sync_sector_values", "同步板块指数", "sync_sector_values"),
     7: ("update_cache", "更新新闻缓存", "update_cache"),
+    8: ("hot_news", "热点新闻简报", "hot_news"),
 }
 
 
@@ -828,13 +829,13 @@ def run_pipeline_full(request: Request):
 
 
 @router.post("/news/pipeline/step")
-def run_pipeline_step(request: Request, step: int = Query(..., ge=1, le=7)):
+def run_pipeline_step(request: Request, step: int = Query(..., ge=1, le=8)):
     """
     触发单个 Pipeline 步骤（异步，后台执行）。
-    step: 1-7 对应各个步骤
+    step: 1-8 对应各个步骤
     """
     if step not in _PIPELINE_STEPS:
-        raise HTTPException(status_code=400, detail=f"无效步骤，有效值：1-7")
+        raise HTTPException(status_code=400, detail=f"无效步骤，有效值：1-8")
 
     name, desc, log_name = _PIPELINE_STEPS[step]
 

@@ -100,6 +100,7 @@ def _find_stocks() -> None:
 def _hot_news() -> None:
     from script.anomaly_news.hot_news import generate_hot_news
     _run_sync(generate_hot_news, min_score=6)
+    _update_cache()
 
 
 def _sync_sector_values() -> None:

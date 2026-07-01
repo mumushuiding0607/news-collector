@@ -4,9 +4,9 @@
   "llmBatchSize": 20,
   "llmTimeout": 120,
   "llmMaxRetries": 3,
-  "newsFilterTimeout": 60,
-  "scorerTimeout": 90,
-  "findStocksTimeout": 120,
+  "newsFilterTimeout": 40,
+  "scorerTimeout": 45,
+  "findStocksTimeout": 80,
   "newsCache": {
     "minScore": 5,
     "hotNewsMinScore": 8,

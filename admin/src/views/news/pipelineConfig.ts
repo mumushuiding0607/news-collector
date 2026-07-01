@@ -8,4 +8,5 @@ export const pipelineSteps = [
   { step: 5, name: "findStocks", desc: "核心标的发现", logFile: "find_stocks" },
   { step: 6, name: "sync_sector_values", desc: "同步板块指数", logFile: "sync_sector_values" },
   { step: 7, name: "update_cache", desc: "更新新闻缓存", logFile: "update_cache" },
+  { step: 8, name: "hot_news", desc: "热点新闻简报", logFile: "hot_news" },
 ];
