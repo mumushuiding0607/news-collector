@@ -185,7 +185,7 @@ echo ================================================================
 echo [INFO] Remove system python3-rich (blocks pip)...
 !SSH_FULL! "apt-get remove -y python3-rich 2>/dev/null || true"
 echo [INFO] Installing packages...
-!SSH_FULL! "cd '%REMOTE_PATH%' && LC_ALL=C python3 -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/ --no-cache-dir --break-system-packages --ignore-installed"
+!SSH_FULL! "cd '%REMOTE_PATH%' && LC_ALL=C python3 -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/ --no-cache-dir --break-system-packages"
 if errorlevel 1 (
     echo [ERROR] pip install failed, please check the error above
     exit /b 1

@@ -40,13 +40,13 @@ echo   Source: !APK_SOURCE!
 echo   Dest: !SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/!APK_FILENAME!
 
 REM Ensure remote dir exists (scp does not auto-create parent dirs)
-ssh -p !SERVER_PORT! -i "!SSH_KEY!" !SERVER_USER!@!SERVER_IP! "mkdir -p !REMOTE_PATH!"
+bash -c "ssh -p !SERVER_PORT! -i '!SSH_KEY!' !SERVER_USER!@!SERVER_IP! 'mkdir -p !REMOTE_PATH!'"
 if errorlevel 1 (
     echo [ERROR] Failed to create remote dir !REMOTE_PATH!
     exit /b 1
 )
 
-scp -P !SERVER_PORT! -i "!SSH_KEY!" "!APK_SOURCE!" "!SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/!APK_FILENAME!"
+bash -c "scp -P !SERVER_PORT! -i '!SSH_KEY!' '!APK_SOURCE!' '!SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/!APK_FILENAME!'"
 if errorlevel 1 (
     echo [ERROR] APK upload failed
     exit /b 1
@@ -60,7 +60,7 @@ set "ICON_FILENAME=app_icon.png"
 
 if exist "!ICON_SOURCE!" (
     echo [INFO] Uploading app_icon.png to server...
-    scp -P !SERVER_PORT! -i "!SSH_KEY!" "!ICON_SOURCE!" "!SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/!ICON_FILENAME!"
+    bash -c "scp -P !SERVER_PORT! -i '!SSH_KEY!' '!ICON_SOURCE!' '!SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/!ICON_FILENAME!'"
     if errorlevel 1 (
         echo [ERROR] app_icon.png upload failed
         exit /b 1
@@ -77,7 +77,7 @@ set "CONFIG_SOURCE=%SCRIPT_DIR%..\backend\config.json"
 
 if exist "!CONFIG_SOURCE!" (
     echo [INFO] Uploading backend/config.json to server...
-    scp -P !SERVER_PORT! -i "!SSH_KEY!" "!CONFIG_SOURCE!" "!SERVER_USER!@!SERVER_IP!:/opt/app/backend/config.json"
+    bash -c "scp -P !SERVER_PORT! -i '!SSH_KEY!' '!CONFIG_SOURCE!' '!SERVER_USER!@!SERVER_IP!:/opt/app/backend/config.json'"
     if errorlevel 1 (
         echo [ERROR] config.json upload failed
         exit /b 1

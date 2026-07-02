@@ -34,13 +34,13 @@ REM ================================================================
 REM Remote paths
 REM ================================================================
 set "REMOTE_CONFIG=/opt/app/backend/config.json"
-set "LOCAL_CONFIG=!TEMP!\config_update_!RANDOM!.json"
+set "LOCAL_CONFIG=/tmp/config_update_!RANDOM!.json"
 
 REM ================================================================
 REM Download remote config
 REM ================================================================
 echo [INFO] Downloading remote config...
-scp -P !SERVER_PORT! -i "!SSH_KEY!" "!SERVER_USER!@!SERVER_IP!:!REMOTE_CONFIG!" "!LOCAL_CONFIG!"
+bash -c "scp -P !SERVER_PORT! -i '!SSH_KEY!' '!SERVER_USER!@!SERVER_IP!:!REMOTE_CONFIG!' '!LOCAL_CONFIG!'"
 if errorlevel 1 (
     echo [ERROR] Failed to fetch remote config
     exit /b 1
@@ -64,7 +64,7 @@ REM ================================================================
 REM Upload updated config
 REM ================================================================
 echo [INFO] Uploading updated config to server...
-scp -P !SERVER_PORT! -i "!SSH_KEY!" "!LOCAL_CONFIG!" "!SERVER_USER!@!SERVER_IP!:!REMOTE_CONFIG!"
+bash -c "scp -P !SERVER_PORT! -i '!SSH_KEY!' '!LOCAL_CONFIG!' '!SERVER_USER!@!SERVER_IP!:!REMOTE_CONFIG!'"
 if errorlevel 1 (
     echo [ERROR] Config upload failed
     del "!LOCAL_CONFIG!" 2>nul

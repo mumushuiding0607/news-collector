@@ -136,8 +136,8 @@
   ],
   "scheduler": {},
   "app_version": {
-    "latest_version": "1.0.14",
-    "latest_build": 14,
+    "latest_version": "1.0.16",
+    "latest_build": 16,
     "min_required_version": "1.0.0",
     "min_required_build": 1,
     "update_description": "修复若干问题，提升稳定性",
@@ -158,7 +158,7 @@
     }
   },
   "download": {
-    "huawei_app_id": "C33455",
+    "huawei_app_id": "117963065",
     "channels": [
       {
         "name": "华为应用市场",

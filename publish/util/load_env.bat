@@ -22,13 +22,21 @@ for /f "usebackq eol=# delims=" %%a in ("%SCRIPT_DIR%.env") do (
 )
 
 REM ================================================================
-REM Fix SSH_KEY path - convert to absolute path
+REM Fix SSH_KEY path - convert to absolute Unix path for ssh/scp
+REM Git Bash uses /c/ prefix, not /mnt/c/
 REM ================================================================
 if defined SSH_KEY (
     if "!SSH_KEY:~1,1!"==":" (
-        REM Already absolute
+        REM Convert Windows absolute path to Unix path for Git Bash
+        set "SSH_KEY_UNIX=!SSH_KEY:C:=/c!"
+        set "SSH_KEY_UNIX=!SSH_KEY_UNIX:\=/!"
+        set "SSH_KEY=!SSH_KEY_UNIX!"
     ) else (
+        REM Relative path - make absolute then convert
         set "SSH_KEY=!SCRIPT_DIR!..\..\deploy\!SSH_KEY!"
+        set "SSH_KEY_UNIX=!SSH_KEY:C:=/c!"
+        set "SSH_KEY_UNIX=!SSH_KEY_UNIX:\=/!"
+        set "SSH_KEY=!SSH_KEY_UNIX!"
     )
 )
 
