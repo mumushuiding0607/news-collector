@@ -4,5 +4,5 @@ import SummaryListView from "../../components/SummaryListView.vue";
 </script>
 
 <template>
-  <SummaryListView type="新闻简报" />
+  <SummaryListView type="热点新闻" />
 </template>

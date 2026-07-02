@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/config_provider.dart';
 import '../../data/models/news_item.dart';
 
 /// 新闻评价属性展示组件
-class NewsCardEvaluation extends StatelessWidget {
+class NewsCardEvaluation extends ConsumerWidget {
   final NewsItem news;
   final bool isLocked;
   final bool showAll;
   final ThemeConfig? theme;
-  final bool isDark;
 
   const NewsCardEvaluation({
     super.key,
@@ -16,7 +16,6 @@ class NewsCardEvaluation extends StatelessWidget {
     this.isLocked = false,
     this.showAll = false,
     this.theme,
-    this.isDark = true,
   });
 
   bool get _hasEvaluation =>
@@ -29,17 +28,18 @@ class NewsCardEvaluation extends StatelessWidget {
       news.maxSectorRise != null;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(themeModeProvider) == AppThemeMode.dark;
     if (!_hasEvaluation) return const SizedBox.shrink();
 
     return Opacity(
       opacity: isLocked ? 0.65 : 1.0,
-      child: showAll ? _buildFullPanel() : _buildCompactTags(),
+      child: showAll ? _buildFullPanel(isDark) : _buildCompactTags(isDark),
     );
   }
 
   /// 紧凑标签形式（用于卡片）
-  Widget _buildCompactTags() {
+  Widget _buildCompactTags(bool isDark) {
     final tags = <Widget>[];
 
     // 方向
@@ -49,7 +49,7 @@ class NewsCardEvaluation extends StatelessWidget {
 
     // 强度
     if (news.intensity != null) {
-      tags.add(_buildIntensityTag(news.intensity!));
+      tags.add(_buildIntensityTag(news.intensity!, isDark));
     }
 
     // 最大涨幅
@@ -67,15 +67,15 @@ class NewsCardEvaluation extends StatelessWidget {
   }
 
   /// 完整面板（用于详情弹窗）
-  Widget _buildFullPanel() {
-    final textMutedColor = isDark ? Colors.white38 : (theme?.textMutedColor ?? Colors.grey);
-    final textColor = isDark ? Colors.white70 : (theme?.textSecondaryColor ?? Colors.grey);
+  Widget _buildFullPanel(bool isDark) {
+    final textMutedColor = isDark ? Colors.white38 : (theme?.textMutedColor ?? const Color(0xFF9B9B9B));
+    final textColor = isDark ? Colors.white70 : (theme?.textSecondaryColor ?? const Color(0xFF5C5C5C));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildInfoRow('方向', _getDirectionLabel(news.direction), Icon(_getDirectionIcon(news.direction), color: _getDirectionColor(news.direction), size: 16), textMutedColor, textColor),
-        if (news.intensity != null) _buildInfoRow('强度', _getIntensityLabel(news.intensity!), _buildIntensityIndicator(news.intensity!), textMutedColor, textColor),
+        if (news.intensity != null) _buildInfoRow('强度', _getIntensityLabel(news.intensity!), _buildIntensityIndicator(news.intensity!, isDark), textMutedColor, textColor),
         if (news.expectedChange != null) _buildInfoRow('预期变化', news.expectedChange!, null, textMutedColor, textColor),
         if (news.duration != null) _buildInfoRow('持续时间', news.duration!, null, textMutedColor, textColor),
         if (news.expectationLevel != null) _buildInfoRow('预期程度', news.expectationLevel!, null, textMutedColor, textColor),
@@ -132,9 +132,10 @@ class NewsCardEvaluation extends StatelessWidget {
     );
   }
 
-  Widget _buildIntensityTag(int intensity) {
+  Widget _buildIntensityTag(int intensity, bool isDark) {
     final bgColor = isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05);
-    final textColor = isDark ? Colors.white70 : (theme?.textSecondaryColor ?? Colors.grey);
+    final textColor = isDark ? Colors.white70 : (theme?.textSecondaryColor ?? const Color(0xFF5C5C5C));
+    final boltColor = isDark ? Colors.amber : const Color(0xFFE53935);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -145,7 +146,7 @@ class NewsCardEvaluation extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.bolt, color: Colors.amber, size: 14),
+          Icon(Icons.bolt, color: boltColor, size: 14),
           const SizedBox(width: 4),
           Text(
             '强度 ${intensity.toString()}',
@@ -180,7 +181,8 @@ class NewsCardEvaluation extends StatelessWidget {
     );
   }
 
-  Widget _buildIntensityIndicator(int intensity) {
+  Widget _buildIntensityIndicator(int intensity, bool isDark) {
+    final boltColor = isDark ? Colors.amber : const Color(0xFFE53935);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(5, (index) {
@@ -190,7 +192,7 @@ class NewsCardEvaluation extends StatelessWidget {
           height: 6,
           margin: const EdgeInsets.only(right: 2),
           decoration: BoxDecoration(
-            color: isFilled ? Colors.amber : (isDark ? Colors.white.withOpacity(0.2) : Colors.grey.withOpacity(0.2)),
+            color: isFilled ? boltColor : (isDark ? Colors.white.withOpacity(0.2) : Colors.grey.withOpacity(0.2)),
             borderRadius: BorderRadius.circular(3),
           ),
         );

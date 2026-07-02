@@ -18,11 +18,15 @@ class NewsDetailSectorSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = ref.watch(themeModeProvider) == AppThemeMode.dark;
     final theme = ref.watch(configProvider).theme;
+    final bgColor = isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.04);
+    final textColor = isDark ? Colors.white70 : const Color(0xFF5C5C5C);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: bgColor,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -30,13 +34,13 @@ class NewsDetailSectorSection extends ConsumerWidget {
         children: [
           Text('板块涨跌', style: TextStyle(color: theme.textMutedColor, fontSize: 12)),
           const SizedBox(height: 12),
-          ...sectors.asMap().entries.map((e) => _buildRow(theme, e.key, e.value)),
+          ...sectors.asMap().entries.map((e) => _buildRow(theme, e.key, e.value, textColor)),
         ],
       ),
     );
   }
 
-  Widget _buildRow(ThemeConfig theme, int index, String sector) {
+  Widget _buildRow(ThemeConfig theme, int index, String sector, Color textColor) {
     final double currentRate = index < currentChangeRates.length ? currentChangeRates[index] : 0.0;
     final change = _getChange(sector);
     final publishPct = change.publishValue > 0 ? (change.change / change.publishValue * 100) : 0.0;
@@ -47,7 +51,7 @@ class NewsDetailSectorSection extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Text(sector, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+          Text(sector, style: TextStyle(color: textColor, fontSize: 14)),
           const SizedBox(width: 12),
           // 当前涨跌幅
           _buildRateChip(

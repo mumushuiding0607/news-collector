@@ -1,15 +1,29 @@
-// Pre-replace version placeholders before android plugin configures
+// Pre-replace version placeholders and write flutter version props before android plugin configures
 gradle.beforeProject {
     if (name == "app") {
-        val manifestFile = java.io.File("${rootDir}/app/src/main/AndroidManifest.xml")
         val metadataFile = java.io.File("${rootDir}/../../publish/metadata.json")
-        if (metadataFile.exists() && manifestFile.exists()) {
+        if (metadataFile.exists()) {
             val metadata = groovy.json.JsonSlurper().parse(metadataFile) as Map<String, Any>
-            val content = manifestFile.readText()
             val vc = (metadata["version_code"] as Number).toString()
             val vn = metadata["version_name"] as String
-            val rewritten = content.replace("__VC__", vc).replace("__VN__", vn)
-            manifestFile.writeText(rewritten)
+
+            // 写入 local.properties，让 Flutter 插件在 apply() 时能读到正确的版本号
+            val localPropsFile = java.io.File("${rootDir}/local.properties")
+            val localProps = java.util.Properties()
+            if (localPropsFile.exists()) {
+                localProps.load(localPropsFile.inputStream())
+            }
+            localProps["flutter.versionCode"] = vc
+            localProps["flutter.versionName"] = vn
+            localPropsFile.outputStream().use { localProps.store(it, "") }
+
+            // 替换 AndroidManifest.xml 中的占位符
+            val manifestFile = java.io.File("${rootDir}/app/src/main/AndroidManifest.xml")
+            if (manifestFile.exists()) {
+                val content = manifestFile.readText()
+                val rewritten = content.replace("__VC__", vc).replace("__VN__", vn)
+                manifestFile.writeText(rewritten)
+            }
         }
     }
 }

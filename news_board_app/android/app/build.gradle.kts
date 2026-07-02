@@ -1,12 +1,7 @@
 import groovy.json.JsonSlurper
 import java.util.Properties
 
-plugins {
-    id("com.android.application")
-    id("dev.flutter.flutter-gradle-plugin")
-}
-
-// ============ 读取 metadata.json ============
+// ============ 读取 metadata.json（必须在 plugins 块之前，以便 Flutter 插件能读到正确的版本号）===========
 val metadataFile = rootProject.layout.projectDirectory.file("../../publish/metadata.json").asFile
 val metadata = run {
     val slurper = JsonSlurper()
@@ -20,15 +15,10 @@ val versionCode = (metadata["version_code"] as Number).toInt()
 val privacyPolicyUrl = metadata["privacy_policy_url"] as String
 val applicationId = metadata["application_id"] as String
 
-// ============ 预先更新 local.properties 让 Flutter 插件读取 ============
-val localProps = Properties()
-val localPropsFile = rootProject.layout.projectDirectory.file("local.properties").asFile
-if (localPropsFile.exists()) {
-    localProps.load(localPropsFile.inputStream())
+plugins {
+    id("com.android.application")
+    id("dev.flutter.flutter-gradle-plugin")
 }
-localProps["flutter.versionCode"] = versionCode.toString()
-localProps["flutter.versionName"] = versionName
-localProps.store(localPropsFile.outputStream(), "")
 
 // ============ 读取 signing.properties ============
 val signingProps = Properties()

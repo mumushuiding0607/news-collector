@@ -58,7 +58,7 @@ function onTabChange(tab: string | number) {
     <el-tabs :model-value="activeTab" @tab-change="onTabChange" style="margin-bottom: 16px">
       <el-tab-pane label="重要性分析" name="importance" />
       <el-tab-pane label="原始数据" name="primary" />
-      <el-tab-pane label="新闻简报" name="summary" />
+      <el-tab-pane label="热点新闻" name="summary" />
     </el-tabs>
 
     <NewsList

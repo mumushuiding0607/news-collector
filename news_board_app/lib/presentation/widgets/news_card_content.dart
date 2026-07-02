@@ -239,7 +239,7 @@ class NewsCardContent extends ConsumerWidget {
   Widget _buildEvaluation(ThemeConfig theme, bool isDark) {
     return Opacity(
       opacity: isLocked ? 0.65 : 1.0,
-      child: NewsCardEvaluation(news: news, isLocked: isLocked, theme: theme, isDark: isDark),
+      child: NewsCardEvaluation(news: news, isLocked: isLocked, theme: theme),
     );
   }
 }
