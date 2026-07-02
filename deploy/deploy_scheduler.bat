@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul 2>&1
 REM ================================================================
 REM News Collector - Scheduler Deployment Script
 REM ================================================================
@@ -13,11 +14,6 @@ setlocal enabledelayedexpansion
 
 set "SCRIPT_DIR=%~dp0"
 set "PROJECT_ROOT=%SCRIPT_DIR%.."
-
-REM Convert Windows path to Unix style for tar (Git Bash style: C: -> /c)
-set "PROJECT_ROOT_UNIX=%PROJECT_ROOT:\=/%"
-set "PROJECT_ROOT_UNIX=!PROJECT_ROOT_UNIX::=!"
-
 set "DEPLOY_DIR=%SCRIPT_DIR%"
 set "ENV_FILE=%DEPLOY_DIR%.env"
 
@@ -96,6 +92,7 @@ echo   Path:   !REMOTE_PATH!
 echo ================================================================
 echo [INFO] Proceeding with deployment...
 echo.
+
 echo [STEP 1] Stop existing scheduler...
 !SSH_FULL! "pkill -f 'backend/run_scheduler.py' || true"
 sleep 2
@@ -104,16 +101,16 @@ sleep 2
 echo [OK] Old scheduler stopped
 
 echo.
-echo [STEP 2] Upload backend config...
-tar -cvf /tmp/backend_config.tar -C "!PROJECT_ROOT_UNIX!" backend/config
-!SCP_FULL! /tmp/backend_config.tar "!SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/backend_config.tar"
-!SSH_FULL! "cd '%REMOTE_PATH%' && tar -xf backend_config.tar && rm -f backend_config.tar"
-rm -f /tmp/backend_config.tar
+echo [STEP 2] Upload scheduler files...
+echo [INFO] Uploading run_scheduler.py...
+!SCP_FULL! "%PROJECT_ROOT%\backend\run_scheduler.py" !SERVER_USER!@!SERVER_IP!:%REMOTE_PATH%/backend/run_scheduler.py
+echo [INFO] Uploading config directory...
+!SCP_FULL! -r "%PROJECT_ROOT%\backend\config" !SERVER_USER!@!SERVER_IP!:%REMOTE_PATH%/backend/config
 echo [OK] Upload complete
 
 echo.
 echo [STEP 3] Start scheduler in background...
-!SSH_FULL! "cd '%REMOTE_PATH%' && nohup python3 backend/run_scheduler.py >> '%REMOTE_PATH%/logs/'$(date +%%Y-%%m-%%d)'/scheduler.log' 2>&1 &"
+!SSH_FULL! "mkdir -p '%REMOTE_PATH%/logs' && cd '%REMOTE_PATH%' && nohup python3 backend/run_scheduler.py >> '%REMOTE_PATH%/logs/scheduler.log' 2>&1 &"
 echo [OK] Scheduler started
 
 echo.
@@ -124,15 +121,15 @@ sleep 2
 echo.
 echo [STEP 5] Show recent logs...
 echo --- scheduler log (first 10 lines) ---
-!SSH_FULL! "head -10 '%REMOTE_PATH%/logs/'$(date +%%Y-%%m-%%d)'/scheduler.log' 2>/dev/null || echo '(no log yet)'"
+for /f "tokens=*" %%a in ('!SSH_FULL! "head -10 '%REMOTE_PATH%/logs/scheduler.log' 2>/dev/null || echo '(no log yet)'" 2^>nul') do echo %%a
 echo --- application log ---
 echo Log directory: %REMOTE_PATH%/logs/
-!SSH_FULL! "ls -la '%REMOTE_PATH%/logs/' 2>/dev/null || echo '(logs dir not found)'"
+for /f "tokens=*" %%a in ('!SSH_FULL! "ls -la '%REMOTE_PATH%/logs/' 2>/dev/null || echo '(logs dir not found)'" 2^>nul') do echo %%a
 echo.
 
 echo ================================================================
 echo   Deployment Complete
 echo ================================================================
-echo   Logs:  !SSH_FULL! "tail -f '%REMOTE_PATH%/logs/'$(date +%%Y-%%m-%%d)'/scheduler.log'"
-echo   Stop:   !SSH_FULL! "pkill -f 'backend/run_scheduler.py'"
+for /f "tokens=*" %%a in ('!SSH_FULL! "echo Logs: tail -f '%REMOTE_PATH%/logs/scheduler.log'" 2^>nul') do echo   %%a
+for /f "tokens=*" %%a in ('!SSH_FULL! "echo Stop: pkill -f 'backend/run_scheduler.py'" 2^>nul') do echo   %%a
 echo ================================================================
