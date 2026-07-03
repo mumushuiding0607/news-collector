@@ -255,7 +255,7 @@ echo ================================================================
 echo   Step 5-7: Start Backend and Scheduler
 echo ================================================================
 set "TODAY=%DATE:~0,4%-%DATE:~5,2%-%DATE:~8,2%"
-set "TODAY=%DATE:~0,4%-%DATE:~5,2%-%DATE:~8,2%"
+for /f "delims=" %%i in ('powershell -Command "Get-Date -Format 'yyyy-MM-dd'"') do set "TODAY=%%i"
 !SSH_FULL! "mkdir -p '%REMOTE_PATH%/logs/%TODAY%'"
 !SSH_FULL! "cd '%REMOTE_PATH%' && nohup python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 31234 > '%REMOTE_PATH%/logs/%TODAY%/global.log' 2>&1 &"
 !SSH_FULL! "cd '%REMOTE_PATH%' && nohup python3 run_scheduler.py >> '%REMOTE_PATH%/logs/%TODAY%/scheduler.log' 2>&1 &"

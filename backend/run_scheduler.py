@@ -166,6 +166,7 @@ def _build_subprocess_cmd(handler: str) -> list[str]:
         "script.crawl.crawler.main": _prefix + "import asyncio; from script.crawl.crawler import main; asyncio.run(main())",
         "backend.core.news_service.update_sector_change_rates": _prefix + "from backend.core.news_service import NewsService; NewsService.update_sector_change_rates()",
         "script.discovery.source_discovery.discover_and_schedule": _prefix + "from script.discovery.source_discovery import discover_and_schedule; discover_and_schedule()",
+        "script.anomaly_news.summary.generate": _prefix + "from script.anomaly_news.summary import generate; generate()",
     }
     if handler not in _handlers:
         raise ValueError(f"不支持的 handler: {handler}")

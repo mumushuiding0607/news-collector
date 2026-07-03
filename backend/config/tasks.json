@@ -44,7 +44,7 @@
       "cron": "0 30 11,15 * * MON-FRI",
       "enabled": true,
       "trigOnDeploy": false,
-      "handler": "script.anomaly_summary.generate_summary"
+      "handler": "script.anomaly_news.summary.generate"
     }
   ]
 }
