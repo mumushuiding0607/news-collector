@@ -86,8 +86,8 @@ call "!FLUTTER_SDK!\bin\flutter.bat" pub get 2>&1 | findstr /C:"Got dependencies
 echo   [OK] dependencies ready
 
 echo.
-echo [INFO] flutter build apk --release...
-call "!FLUTTER_SDK!\bin\flutter.bat" build apk --release 2>&1
+echo [INFO] flutter build apk --release --build-name=!VERSION_NAME! --build-number=!VERSION_CODE!...
+call "!FLUTTER_SDK!\bin\flutter.bat" build apk --release --build-name=!VERSION_NAME! --build-number=!VERSION_CODE! 2>&1
 
 if errorlevel 1 (
     echo.
@@ -104,6 +104,10 @@ if exist "!APK_SRC!" (
     set "APK_SIZE_MB=!APK_SIZE:~0,-3!"
     echo.
     echo   [OK] APK built successfully
+    echo.
+    echo [INFO] Verifying APK version...
+    for /f "delims=" %%v in ('!JAVA_HOME!\bin\appt.bat dump badging "!APK_SRC!" 2^>nul ^| findstr "versionName"') do echo   %%v
+    for /f "delims=" %%c in ('!JAVA_HOME!\bin\appt.bat dump badging "!APK_SRC!" 2^>nul ^| findstr "versionCode"') do echo   %%c
 ) else (
     echo [ERROR] APK file not found
     exit /b 1

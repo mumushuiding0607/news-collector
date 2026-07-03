@@ -45,6 +45,8 @@ android {
         versionName = versionName
         manifestPlaceholders["appName"] = appName
         manifestPlaceholders["privacyPolicyUrl"] = privacyPolicyUrl
+        manifestPlaceholders["versionName"] = versionName
+        manifestPlaceholders["versionCode"] = versionCode.toString()
     }
 
     signingConfigs {

@@ -108,14 +108,31 @@ if not defined SERVER_IP (
 REM ================================================================
 REM Build SSH/SCP command prefix
 REM ================================================================
+set "SSH_KEY_ABS="
+if defined SSH_KEY (
+    REM Resolve relative path from PROJECT_ROOT
+    set "SSH_KEY_FULL=!PROJECT_ROOT!\!SSH_KEY!"
+)
+goto :after_keypath
+:convert_keypath
+for /f "delims=" %%i in ('powershell -Command "[System.IO.Path]::GetFullPath('%~1')"') do set "SSH_KEY_ABS=%%i"
+exit /b 0
+:after_keypath
+if defined SSH_KEY (
+    call :convert_keypath "!SSH_KEY_FULL!"
+    if defined SSH_KEY_ABS (
+        icacls "!SSH_KEY_ABS!" /inheritance:r /grant:r "!USERNAME!:R" >nul 2>&1
+    )
+)
+
 set "SSH_CMD=ssh"
 set "SCP_CMD=scp"
-if defined SSH_KEY (
-    set "SSH_CMD=ssh -i !SSH_KEY!"
-    set "SCP_CMD=scp -i !SSH_KEY!"
+if defined SSH_KEY_ABS (
+    set "SSH_CMD=ssh -i !SSH_KEY_ABS!"
+    set "SCP_CMD=scp -i !SSH_KEY_ABS!"
 )
-set "SSH_FULL=!SSH_CMD! -p %SERVER_PORT% -o LogLevel=ERROR %SERVER_USER%@%SERVER_IP%"
-set "SCP_FULL=!SCP_CMD! -P %SERVER_PORT%"
+set "SSH_FULL=!SSH_CMD! -p !SERVER_PORT! -o LogLevel=ERROR !SERVER_USER!@!SERVER_IP!"
+set "SCP_FULL=!SCP_CMD! -P !SERVER_PORT!"
 
 REM ================================================================
 REM Check required files
@@ -150,7 +167,7 @@ echo   Deployment Confirmation
 echo ================================================================
 echo   Server: !SERVER_USER!@!SERVER_IP!:!SERVER_PORT!
 echo   Path:   !REMOTE_PATH!
-if defined SSH_KEY echo   Key:   !SSH_KEY!
+if defined SSH_KEY_ABS echo   Key:   !SSH_KEY_ABS!
 echo   Mode:   Python + uvicorn (no Docker)
 echo ================================================================
 REM Confirmation removed - auto-proceed
@@ -212,8 +229,14 @@ if exist "%PROJECT_ROOT%\backend\.env" (
     !SCP_FULL! "%PROJECT_ROOT%\backend\.env" %SERVER_USER%@!SERVER_IP!:%REMOTE_PATH%/backend/.env
 )
 
-echo [INFO] Uploading backend directory...
-!SCP_FULL! -r "%PROJECT_ROOT%\backend" %SERVER_USER%@!SERVER_IP!:%REMOTE_PATH%
+echo [INFO] Uploading backend directory (excluding cache)...
+for /f "delims=" %%i in ('bash -c "command -v rsync" 2^>nul') do set "RSYNC_CMD=%%i"
+if defined RSYNC_CMD (
+    bash -c "rsync -az --exclude='cache' --exclude='__pycache__' --exclude='*.pyc' -e 'ssh -p !SERVER_PORT! -i !SSH_KEY_ABS!' '%PROJECT_ROOT:\=/%/backend' !SERVER_USER!@!SERVER_IP!:'%REMOTE_PATH%'"
+) else (
+    echo [WARN] rsync not available, using scp (cache will be uploaded)
+    !SCP_FULL! -r "%PROJECT_ROOT%\backend" %SERVER_USER%@!SERVER_IP!:%REMOTE_PATH%
+)
 
 echo [OK] Upload complete
 
@@ -231,25 +254,25 @@ echo.
 echo ================================================================
 echo   Step 5-7: Start Backend and Scheduler
 echo ================================================================
-!SSH_FULL! "cd '%REMOTE_PATH%' && nohup python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 31234 > /var/log/news_collector.log 2>&1 &"
-!SSH_FULL! "cd '%REMOTE_PATH%' && nohup python3 run_scheduler.py > /var/log/news_scheduler.log 2>&1 &"
-!SSH_FULL! "sleep 3 && curl -s http://localhost:31234/api/health && echo '[OK] Backend is running' || echo '[ERROR] Backend not responding'"
+set "TODAY=%DATE:~0,4%-%DATE:~5,2%-%DATE:~8,2%"
+set "TODAY=%DATE:~0,4%-%DATE:~5,2%-%DATE:~8,2%"
+!SSH_FULL! "mkdir -p '%REMOTE_PATH%/logs/%TODAY%'"
+!SSH_FULL! "cd '%REMOTE_PATH%' && nohup python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 31234 > '%REMOTE_PATH%/logs/%TODAY%/global.log' 2>&1 &"
+!SSH_FULL! "cd '%REMOTE_PATH%' && nohup python3 run_scheduler.py >> '%REMOTE_PATH%/logs/%TODAY%/scheduler.log' 2>&1 &"
+!SSH_FULL! "sleep 5 && curl -s --max-time 10 http://localhost:31234/api/health && echo '[OK] Backend is running' || echo '[ERROR] Backend not responding'"
 
 echo.
 echo ================================================================
 echo   Deployment Log Output
 echo ================================================================
-echo --- Backend Service Log (last 5 lines) ---
-for /f "tokens=*" %%a in ('!SSH_FULL! "tail -5 /var/log/news_collector.log 2>/dev/null || echo '(no log yet)'" 2^>nul') do echo %%a
+echo --- Global Log (last 5 lines) ---
+for /f "tokens=*" %%a in ('!SSH_FULL! "tail -5 '%REMOTE_PATH%/logs/%TODAY%/global.log' 2>/dev/null || echo '(no log yet)'" 2^>nul') do echo %%a
 echo.
-echo --- Scheduler Process Log (last 10 lines) ---
-for /f "tokens=*" %%a in ('!SSH_FULL! "tail -10 /var/log/news_scheduler.log 2>/dev/null || echo '(no scheduler log yet)'" 2^>nul') do echo %%a
+echo --- Scheduler Log (last 10 lines) ---
+for /f "tokens=*" %%a in ('!SSH_FULL! "tail -10 '%REMOTE_PATH%/logs/%TODAY%/scheduler.log' 2>/dev/null || echo '(no scheduler log yet)'" 2^>nul') do echo %%a
 echo.
-echo --- Application Logs Directory ---
-for /f "tokens=*" %%a in ('!SSH_FULL! "ls -la '%REMOTE_PATH%/logs/' 2>/dev/null || echo '(no logs directory)'" 2^>nul') do echo %%a
-echo.
-echo --- Latest Global Log (last 5 lines) ---
-for /f "tokens=*" %%a in ('!SSH_FULL! "ls -t '%REMOTE_PATH%/logs/'/*/global.log 2>/dev/null | head -1 | xargs tail -5 2>/dev/null || echo '(no global.log yet)'" 2^>nul') do echo %%a
+echo --- Today Logs Directory ---
+for /f "tokens=*" %%a in ('!SSH_FULL! "ls -la '%REMOTE_PATH%/logs/%TODAY%/' 2>/dev/null || echo '(no logs directory)'" 2^>nul') do echo %%a
 echo.
 REM Step 8: Save requirements.txt as baseline for next diff
 REM ================================================================

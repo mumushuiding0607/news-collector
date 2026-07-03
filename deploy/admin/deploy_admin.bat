@@ -15,7 +15,7 @@ REM ================================================================
 setlocal enabledelayedexpansion
 
 set "SCRIPT_DIR=%~dp0"
-set "PROJECT_ROOT=%~dp0..\.."
+for %%i in ("%~dp0..\..") do set "PROJECT_ROOT=%%~fi"
 set "ADMIN_DIR=%PROJECT_ROOT%\admin"
 set "ENV_FILE=%PROJECT_ROOT%\deploy\.env"
 
@@ -29,11 +29,21 @@ if exist "!ENV_FILE!" (
 )
 
 REM ================================================================
-REM Resolve SSH key path (absolute from project root)
-REM SSH_KEY is relative to deploy/ directory, key is in project root
+REM SSH key path - resolve relative path and fix permissions
 REM ================================================================
 if defined SSH_KEY (
-    set "SSH_KEY_ABS=%PROJECT_ROOT%\news_collector.pem"
+    set "SSH_KEY_FULL=!PROJECT_ROOT!\!SSH_KEY!"
+)
+goto :after_keypath
+:convert_keypath
+for /f "delims=" %%i in ('powershell -Command "[System.IO.Path]::GetFullPath('%~1')"') do set "SSH_KEY_ABS=%%i"
+exit /b 0
+:after_keypath
+if defined SSH_KEY (
+    call :convert_keypath "!SSH_KEY_FULL!"
+    if defined SSH_KEY_ABS (
+        icacls "!SSH_KEY_ABS!" /inheritance:r /grant:r "!USERNAME!:R" >nul 2>&1
+    )
 )
 
 echo ================================================================
@@ -95,17 +105,17 @@ if not exist "!ADMIN_DIR!\dist" (
 REM Create remote directory (clean)
 echo [INFO] Cleaning remote directory...
 if defined SSH_KEY_ABS (
-    bash -c "ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! 'rm -rf !REMOTE_PATH!/admin/*'"
+    "E:\Git\usr\bin\ssh.exe" -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "rm -rf !REMOTE_PATH!/admin/*"
 ) else (
-    bash -c "ssh -p !SERVER_PORT! !SERVER_USER!@!SERVER_IP! 'rm -rf !REMOTE_PATH!/admin/*'"
+    "E:\Git\usr\bin\ssh.exe" -p !SERVER_PORT! !SERVER_USER!@!SERVER_IP! "rm -rf !REMOTE_PATH!/admin/*"
 )
 
 REM Upload build files
 echo [INFO] Uploading build files...
 if defined SSH_KEY_ABS (
-    bash -c "scp -P !SERVER_PORT! -i '!SSH_KEY_ABS!' -r '!ADMIN_DIR!\dist'/* !SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/admin/"
+    "E:\Git\usr\bin\scp.exe" -P !SERVER_PORT! -i '!SSH_KEY_ABS!' -r '!ADMIN_DIR!\dist'/* !SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/admin/
 ) else (
-    bash -c "scp -P !SERVER_PORT! -r '!ADMIN_DIR!\dist'/* !SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/admin/"
+    "E:\Git\usr\bin\scp.exe" -P !SERVER_PORT! -r '!ADMIN_DIR!\dist'/* !SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/admin/
 )
 if errorlevel 1 (
     echo [ERROR] Upload failed
@@ -118,18 +128,10 @@ echo.
 echo [INFO] Checking remote Node.js environment...
 
 REM Check if npm is available on remote server
-if defined SSH_KEY_ABS (
-    bash -c "ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! 'command -v npm'"
-) else (
-    bash -c "ssh -p !SERVER_PORT! !SERVER_USER!@!SERVER_IP! 'command -v npm'"
-)
+"E:\Git\usr\bin\ssh.exe" -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "command -v npm"
 if errorlevel 1 (
     echo [WARN] npm not found on remote server, attempting to install Node.js...
-    if defined SSH_KEY_ABS (
-        bash -c "ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! 'curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs'"
-    ) else (
-        bash -c "ssh -p !SERVER_PORT! !SERVER_USER!@!SERVER_IP! 'curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs'"
-    )
+    "E:\Git\usr\bin\ssh.exe" -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs"
     if errorlevel 1 (
         echo [ERROR] Node.js installation failed. Please install Node.js on the server manually.
         exit /b 1
@@ -140,11 +142,7 @@ if errorlevel 1 (
 )
 
 REM Check and install PM2 if needed
-if defined SSH_KEY_ABS (
-    bash -c "ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! 'command -v pm2 || npm install -g pm2'"
-) else (
-    bash -c "ssh -p !SERVER_PORT! !SERVER_USER!@!SERVER_IP! 'command -v pm2 || npm install -g pm2'"
-)
+"E:\Git\usr\bin\ssh.exe" -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "command -v pm2 || npm install -g pm2"
 if errorlevel 1 (
     echo [ERROR] PM2 installation failed
     exit /b 1
@@ -152,18 +150,10 @@ if errorlevel 1 (
 echo [OK] PM2 ready
 
 REM Stop and delete existing service (ignore errors)
-if defined SSH_KEY_ABS (
-    bash -c "ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! 'pm2 stop admin-web 2>/dev/null; pm2 delete admin-web 2>/dev/null; true'"
-) else (
-    bash -c "ssh -p !SERVER_PORT! !SERVER_USER!@!SERVER_IP! 'pm2 stop admin-web 2>/dev/null; pm2 delete admin-web 2>/dev/null; true'"
-)
+"E:\Git\usr\bin\ssh.exe" -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "pm2 stop admin-web 2>/dev/null; pm2 delete admin-web 2>/dev/null; true"
 
 REM Start new service (SPA mode for Vue router)
-if defined SSH_KEY_ABS (
-    bash -c "ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! 'pm2 serve /opt/app/admin --name admin-web --port 5173 --spa'"
-) else (
-    bash -c "ssh -p !SERVER_PORT! !SERVER_USER!@!SERVER_IP! 'pm2 serve /opt/app/admin --name admin-web --port 5173 --spa'"
-)
+"E:\Git\usr\bin\ssh.exe" -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "pm2 serve !REMOTE_PATH!/admin --name admin-web --port 5173 --spa"
 echo [OK] Service restarted
 
 REM ================================================================
