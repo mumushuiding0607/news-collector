@@ -155,3 +155,22 @@ def update_app_version_config(updates: dict) -> dict:
     current["app_version"].update(updates)
     _save_json_config(_CONFIG_PATH, current)
     return current["app_version"]
+
+
+def get_sources_config() -> dict:
+    """获取 sources.json 爬虫配置"""
+    sources_path = _PROJECT_ROOT / "backend" / "config" / "sources.json"
+    return _load_json_config(sources_path)
+
+
+def update_sources_config(updates: dict) -> dict:
+    """
+    更新 sources.json 爬虫配置（部分更新，深度合并嵌套 dict）
+    例如：update_sources_config({"crawNumPerSource": 50})
+    例如：update_sources_config({"newsCache": {"minScore": 10}})
+    """
+    sources_path = _PROJECT_ROOT / "backend" / "config" / "sources.json"
+    current = _load_json_config(sources_path)
+    current = _deep_merge(current, updates)
+    _save_json_config(sources_path, current)
+    return current
