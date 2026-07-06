@@ -15,6 +15,7 @@ from core.config_service import (
     get_env_config, update_env_config,
     get_full_config, get_public_config,
     get_app_version_config, update_app_version_config,
+    get_sources_config, update_sources_config,
 )
 from backend.api._auth import require_admin
 
@@ -141,3 +142,23 @@ def update_subscription_tiers(request: Request, tiers: list[dict]):
     cfg["subscription_tiers"] = tiers
     update_app_config({"subscription_tiers": tiers})
     return {"subscription_tiers": tiers}
+
+
+@router.get("/sources")
+def get_config_sources(request: Request):
+    """获取 sources.json 爬虫配置"""
+    require_admin(request)
+    return get_sources_config()
+
+
+@router.post("/sources")
+def update_config_sources(request: Request, updates: dict):
+    """
+    更新 sources.json 爬虫配置（部分更新）
+    传入 {"crawNumPerSource": 50} 或 {"newsCache": {"minScore": 10}}
+    """
+    require_admin(request)
+    try:
+        return update_sources_config(updates)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
