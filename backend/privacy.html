@@ -3,7 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>隐私政策 - 风向标AI</title>
+<title id="page-title">隐私政策</title>
+<script>
+fetch('/api/config').then(r=>r.json()).then(c=>{
+  const name = c.app_name || '指南针AI';
+  document.title = '隐私政策 - ' + name;
+  document.querySelectorAll('[data-app-name]').forEach(el=>el.textContent=name);
+});
+</script>
 <style>
 body { font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px 40px; line-height: 1.8; color: #333; }
 h1 { color: #FF6B00; margin-bottom: 8px; }
@@ -17,10 +24,10 @@ h2 { margin-top: 32px; color: #222; font-size: 18px; }
 <body>
 
 <h1>隐私政策</h1>
-<p class="subtitle">风向标AI 新闻平台 · 最后更新：2026年6月</p>
+<p class="subtitle"><span data-app-name>指南针AI</span> 新闻平台 · 最后更新：2026年6月</p>
 
 <div class="highlight">
-<p><strong>风向标AI郑重承诺：</strong>我们不会收集与服务无关的个人信息，不会将您的数据出售给任何第三方。</p>
+<p><strong><span data-app-name>指南针AI</span>郑重承诺：</strong>我们不会收集与服务无关的个人信息，不会将您的数据出售给任何第三方。</p>
 </div>
 
 <h2>一、信息收集</h2>
@@ -44,7 +51,7 @@ h2 { margin-top: 32px; color: #222; font-size: 18px; }
 <p>如有任何隐私相关问题，请发送邮件至：<strong>181457121@qq.com</strong></p>
 
 <div class="footer">
-<p>风向标AI · 让信息差成为你的优势</p>
+<p><span data-app-name>指南针AI</span> · 让信息差成为你的优势</p>
 </div>
 
 </body>

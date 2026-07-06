@@ -61,7 +61,7 @@ function navigateTo(path: string) {
       :with-header="false"
     >
       <div style="padding: 12px 16px; color: var(--text-h); font-size: 14px; font-weight: bold; border-bottom: 1px solid var(--border)">
-        新闻风向标 · Admin
+        新闻指南针 · Admin
       </div>
       <el-menu
         :default-active="$route.path"
@@ -81,7 +81,7 @@ function navigateTo(path: string) {
     <!-- 桌面端侧边栏 -->
     <el-aside v-if="!isMobile" :style="asideStyle" style="background: var(--sidebar-bg); border-right: 1px solid var(--border)">
       <div style="padding: 12px 16px; color: var(--text-h); font-size: 14px; font-weight: bold; border-bottom: 1px solid var(--border)">
-        新闻风向标 · Admin
+        新闻指南针 · Admin
       </div>
       <el-menu
         :default-active="$route.path"

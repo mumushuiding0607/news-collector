@@ -5,7 +5,7 @@
   "llmTimeout": 120,
   "llmMaxRetries": 3,
   "newsFilterTimeout": 40,
-  "scorerTimeout": 45,
+  "scorerTimeout": 90,
   "findStocksTimeout": 80,
   "newsCache": {
     "minScore": 5,

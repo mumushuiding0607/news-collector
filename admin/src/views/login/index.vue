@@ -37,7 +37,7 @@ async function handleLogin() {
     <el-card style="width: 360px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px">
       <template #header>
         <div style="text-align: center; color: var(--gold); font-size: 20px; font-weight: bold">
-          新闻风向标 · 管理员登录
+          新闻指南针 · 管理员登录
         </div>
       </template>
 

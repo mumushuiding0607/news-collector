@@ -1,11 +1,11 @@
 {
-  "app_name": "风向标",
+  "app_name": "指南针AI",
   "app_subtitle": "热点早知道",
   "sms_login_enabled": false,
   "password_login_enabled": true,
   "subscription_pay_method": "personal",
   "home": {
-    "title": "风向标",
+    "title": "指南针",
     "subtitle": "实时跟踪"
   },
   "texts": {

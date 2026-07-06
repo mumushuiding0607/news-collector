@@ -274,7 +274,7 @@ class AppConfig {
 
   const AppConfig({
     this.appName = '热点早知道',
-    this.appSubtitle = '市场风向标',
+    this.appSubtitle = '市场指南针',
     this.smsLoginEnabled = true,
     this.passwordLoginEnabled = true,
     this.subscriptionTiers = const [],
@@ -292,7 +292,7 @@ class AppConfig {
   factory AppConfig.fromJson(Map<String, dynamic> json) {
     return AppConfig(
       appName: json['app_name'] as String? ?? '热点早知道',
-      appSubtitle: json['app_subtitle'] as String? ?? '市场风向标',
+      appSubtitle: json['app_subtitle'] as String? ?? '市场指南针',
       smsLoginEnabled: json['sms_login_enabled'] as bool? ?? true,
       passwordLoginEnabled: json['password_login_enabled'] as bool? ?? true,
       subscriptionTiers: (json['subscription_tiers'] as List<dynamic>?)
@@ -397,13 +397,13 @@ class HomeConfig {
   final String subtitle;
 
   const HomeConfig({
-    this.title = '市场风向标',
+    this.title = '市场指南针',
     this.subtitle = '实时跟踪',
   });
 
   factory HomeConfig.fromJson(Map<String, dynamic> json) {
     return HomeConfig(
-      title: json['title'] as String? ?? '市场风向标',
+      title: json['title'] as String? ?? '市场指南针',
       subtitle: json['subtitle'] as String? ?? '实时跟踪',
     );
   }
