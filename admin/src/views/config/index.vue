@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { getAppConfig, updateAppConfig, getEnvConfig, updateEnvConfig } from "../../api";
+import { getAppConfig, updateAppConfig, getEnvConfig, updateEnvConfig, getSourcesConfig, updateSourcesConfig } from "../../api";
 
 const appConfig = ref<Record<string, unknown>>({});
 const envConfig = ref<Record<string, unknown>>({});
@@ -24,12 +24,29 @@ const envForm = ref({
   SMTP_USER: "",
 });
 
+const sourcesForm = ref({
+  crawNumPerSource: 30,
+  maxConsecutiveNonToday: 10,
+  llmBatchSize: 20,
+  llmTimeout: 120,
+  llmMaxRetries: 3,
+  newsFilterTimeout: 40,
+  scorerTimeout: 90,
+  findStocksTimeout: 80,
+  newsCache: {
+    minScore: 5,
+    hotNewsMinScore: 8,
+    historyDays: 3,
+  },
+});
+
 async function fetchConfig() {
   loading.value = true;
   try {
-    const [appData, envData] = await Promise.all([
+    const [appData, envData, sourcesData] = await Promise.all([
       getAppConfig() as unknown as Promise<Record<string, unknown>>,
       getEnvConfig() as unknown as Promise<Record<string, unknown>>,
+      getSourcesConfig() as unknown as Promise<Record<string, unknown>>,
     ]);
     appConfig.value = appData;
     envConfig.value = envData;
@@ -52,6 +69,23 @@ async function fetchConfig() {
         SMTP_HOST: (envData["SMTP_HOST"] as string) || "",
         SMTP_PORT: (envData["SMTP_PORT"] as string) || "",
         SMTP_USER: (envData["SMTP_USER"] as string) || "",
+      };
+    }
+    if (sourcesData) {
+      sourcesForm.value = {
+        crawNumPerSource: sourcesData["crawNumPerSource"] ?? 30,
+        maxConsecutiveNonToday: sourcesData["maxConsecutiveNonToday"] ?? 10,
+        llmBatchSize: sourcesData["llmBatchSize"] ?? 20,
+        llmTimeout: sourcesData["llmTimeout"] ?? 120,
+        llmMaxRetries: sourcesData["llmMaxRetries"] ?? 3,
+        newsFilterTimeout: sourcesData["newsFilterTimeout"] ?? 40,
+        scorerTimeout: sourcesData["scorerTimeout"] ?? 90,
+        findStocksTimeout: sourcesData["findStocksTimeout"] ?? 80,
+        newsCache: {
+          minScore: sourcesData["newsCache"]?.["minScore"] ?? 5,
+          hotNewsMinScore: sourcesData["newsCache"]?.["hotNewsMinScore"] ?? 8,
+          historyDays: sourcesData["newsCache"]?.["historyDays"] ?? 3,
+        },
       };
     }
   } catch (e) {
@@ -87,6 +121,19 @@ async function handleSaveEnv() {
   try {
     await updateEnvConfig(envForm.value);
     alert("环境变量保存成功");
+  } catch (e) {
+    console.error(e);
+    alert("保存失败");
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function handleSaveSources() {
+  saving.value = true;
+  try {
+    await updateSourcesConfig(sourcesForm.value);
+    alert("Sources 配置保存成功");
   } catch (e) {
     console.error(e);
     alert("保存失败");
@@ -152,6 +199,57 @@ onMounted(fetchConfig);
             </el-form-item>
             <el-form-item>
               <el-button type="primary" :loading="saving" @click="handleSaveEnv">保存配置</el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+      </el-tab-pane>
+
+      <el-tab-pane label="Sources 配置" name="sources">
+        <el-card style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px">
+          <el-form :model="sourcesForm" label-width="160px" style="max-width: 700px">
+            <el-divider content-position="left">采集参数</el-divider>
+            <el-form-item label="每源采集数量">
+              <el-input-number v-model="sourcesForm.crawNumPerSource" :min="1" :max="1000" />
+            </el-form-item>
+            <el-form-item label="最大连续非当日数">
+              <el-input-number v-model="sourcesForm.maxConsecutiveNonToday" :min="1" :max="100" />
+            </el-form-item>
+
+            <el-divider content-position="left">LLM 参数</el-divider>
+            <el-form-item label="LLM 批次大小">
+              <el-input-number v-model="sourcesForm.llmBatchSize" :min="1" :max="200" />
+            </el-form-item>
+            <el-form-item label="LLM 超时（秒）">
+              <el-input-number v-model="sourcesForm.llmTimeout" :min="10" :max="600" />
+            </el-form-item>
+            <el-form-item label="LLM 最大重试">
+              <el-input-number v-model="sourcesForm.llmMaxRetries" :min="0" :max="10" />
+            </el-form-item>
+
+            <el-divider content-position="left">超时配置</el-divider>
+            <el-form-item label="新闻过滤超时（秒）">
+              <el-input-number v-model="sourcesForm.newsFilterTimeout" :min="5" :max="300" />
+            </el-form-item>
+            <el-form-item label="评分超时（秒）">
+              <el-input-number v-model="sourcesForm.scorerTimeout" :min="5" :max="300" />
+            </el-form-item>
+            <el-form-item label="找股票超时（秒）">
+              <el-input-number v-model="sourcesForm.findStocksTimeout" :min="5" :max="300" />
+            </el-form-item>
+
+            <el-divider content-position="left">缓存配置</el-divider>
+            <el-form-item label="最低分数">
+              <el-input-number v-model="sourcesForm.newsCache.minScore" :min="0" :max="100" />
+            </el-form-item>
+            <el-form-item label="热点新闻最低分">
+              <el-input-number v-model="sourcesForm.newsCache.hotNewsMinScore" :min="0" :max="100" />
+            </el-form-item>
+            <el-form-item label="历史天数">
+              <el-input-number v-model="sourcesForm.newsCache.historyDays" :min="1" :max="30" />
+            </el-form-item>
+
+            <el-form-item>
+              <el-button type="primary" :loading="saving" @click="handleSaveSources">保存配置</el-button>
             </el-form-item>
           </el-form>
         </el-card>
