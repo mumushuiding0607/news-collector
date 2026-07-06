@@ -15,3 +15,8 @@ export const getSubscriptionTiers = () =>
 
 export const updateSubscriptionTiers = (tiers: Record<string, unknown>[]) =>
   api.post("/api/config/subscription_tiers", tiers);
+
+export const getSourcesConfig = () => api.get("/api/config/sources");
+
+export const updateSourcesConfig = (data: Record<string, unknown>) =>
+  api.post("/api/config/sources", data);
