@@ -14,7 +14,6 @@ from datetime import date
 
 # -*- 在 import bootstrap 前解析 --db 参数 -*-
 import os
-import sys
 for i, arg in enumerate(sys.argv):
     if arg == "--db" and i + 1 < len(sys.argv):
         os.environ["NEWS_DB"] = sys.argv[i + 1]

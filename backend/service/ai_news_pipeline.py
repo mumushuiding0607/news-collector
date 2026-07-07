@@ -9,6 +9,7 @@ ai_news_pipeline.py - AI 新闻采集评分完整流程服务
   python service/ai_news_pipeline.py --end 3      # 跑到 Step 3 结束
 """
 import argparse
+import os
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -137,7 +138,6 @@ def _parse_args() -> tuple[int, int | None]:
     args = parser.parse_args()
 
     # 设置数据库环境变量（在 import 前）
-    import os
     os.environ["NEWS_DB"] = args.db
 
     if args.only is not None:

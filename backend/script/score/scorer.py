@@ -29,16 +29,7 @@ def _is_ai_news_db() -> bool:
     return "ai_news" in os.environ.get("NEWS_DB", "")
 
 
-# AI 新闻短名映射
-_SHORT_TO_LONG_AI = {
-    "s": "score",
-    "tn": "tech_novelty",
-    "m": "monetization",
-    "ad": "domains",
-    "kh": "highlights",
-    "r": "reason",
-}
-
+# AI 新闻短名映射（内联于 _get_ai 使用）
 from script.db import get_unread, mark_scored, insert_importance
 from script.db.sectors import normalize
 from script.crawl.crawl_config import get_crawl_config
