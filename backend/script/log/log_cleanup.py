@@ -40,9 +40,13 @@ def cleanup_old_logs(days: int = 7) -> dict:
             continue
 
         if dir_date < cutoff:
-            shutil.rmtree(entry)
-            logger.info(f"[LogCleanup] 已删除日志目录: {entry.name}")
-            deleted.append(entry.name)
+            try:
+                shutil.rmtree(entry)
+                logger.info(f"[LogCleanup] 已删除日志目录: {entry.name}")
+                deleted.append(entry.name)
+            except Exception as e:
+                logger.error(f"[LogCleanup] 删除失败 {entry.name}: {e}")
+                continue
 
     logger.info(f"[LogCleanup] 清理完成，共删除 {len(deleted)} 个目录")
     return {"deleted": deleted, "count": len(deleted)}
