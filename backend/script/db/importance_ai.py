@@ -40,13 +40,79 @@ def insert_ai(row: dict, commit: bool = True) -> int | None:
 
 
 def get_recent_ai(limit: int = 50) -> list[dict]:
-    """查询最近 N 条 AI 新闻评分。"""
+    """查询最近 N 条 AI 新闻评分（按时间倒序）。"""
     conn = get_conn()
     try:
         rows = conn.execute(
             "SELECT * FROM importance_ai ORDER BY id DESC LIMIT ?", (limit,)
         ).fetchall()
         cols = [d[0] for d in conn.execute("SELECT * FROM importance_ai LIMIT 0").description]
+        return [dict(zip(cols, r)) for r in rows]
+    finally:
+        put_conn(conn)
+
+
+def get_latest_ai(limit: int = 50) -> list[dict]:
+    """查询评分最高的 N 条 AI 新闻（按评分倒序）。"""
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM importance_ai ORDER BY score DESC, created_at DESC LIMIT ?", (limit,)
+        ).fetchall()
+        cols = [d[0] for d in conn.execute("SELECT * FROM importance_ai LIMIT 0").description]
+        return [dict(zip(cols, r)) for r in rows]
+    finally:
+        put_conn(conn)
+
+
+def get_history_ai(limit: int = 100) -> list[dict]:
+    """查询最近 N 条 AI 新闻（按时间倒序）。"""
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM importance_ai ORDER BY created_at DESC LIMIT ?", (limit,)
+        ).fetchall()
+        cols = [d[0] for d in conn.execute("SELECT * FROM importance_ai LIMIT 0").description]
+        return [dict(zip(cols, r)) for r in rows]
+    finally:
+        put_conn(conn)
+
+
+def _row_to_ai_with_content(row, cols) -> dict:
+    """将 importance_ai 行转为 dict，并附加 primary_sources.content"""
+    d = dict(zip(cols, row))
+    return d
+
+
+def get_latest_ai_with_content(limit: int = 50) -> list[dict]:
+    """查询评分最高的 N 条 AI 新闻（含正文内容）。"""
+    conn = get_conn()
+    try:
+        rows = conn.execute("""
+            SELECT ia.*, ps.content
+            FROM importance_ai ia
+            LEFT JOIN primary_sources ps ON ia.news_id = ps.id
+            ORDER BY ia.score DESC, ia.created_at DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+        cols = [d[0] for d in conn.execute("SELECT * FROM importance_ai LIMIT 0").description] + ["content"]
+        return [dict(zip(cols, r)) for r in rows]
+    finally:
+        put_conn(conn)
+
+
+def get_history_ai_with_content(limit: int = 100) -> list[dict]:
+    """查询最近 N 条 AI 新闻（含正文内容）。"""
+    conn = get_conn()
+    try:
+        rows = conn.execute("""
+            SELECT ia.*, ps.content
+            FROM importance_ai ia
+            LEFT JOIN primary_sources ps ON ia.news_id = ps.id
+            ORDER BY ia.created_at DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+        cols = [d[0] for d in conn.execute("SELECT * FROM importance_ai LIMIT 0").description] + ["content"]
         return [dict(zip(cols, r)) for r in rows]
     finally:
         put_conn(conn)

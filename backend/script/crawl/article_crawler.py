@@ -6,20 +6,19 @@ article_crawler.py - Step 3: 增量采集文章正文
 """
 import asyncio
 import re
+import sys
 from datetime import date
 from pathlib import Path
 
 from bs4 import BeautifulSoup
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 
-import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
-# -*- 在 import bootstrap 前解析 --db 参数 -*-
-import os
-for i, arg in enumerate(sys.argv):
-    if arg == "--db" and i + 1 < len(sys.argv):
-        os.environ["NEWS_DB"] = sys.argv[i + 1]
-        break
+
+# 在 import bootstrap 前解析 --type 参数（必须最早执行）
+from script.bootstrap import parse_db_arg
+sys.argv = parse_db_arg(sys.argv)
+
 from script.discovery.html_cleaner import clean_article_html
 from script.bootstrap import *
 from script.crawl.crawl_config import get_source_is_flash
@@ -120,9 +119,14 @@ def _extract_by_selector(html: str, selector: str, remove_selectors: list = None
     if not selector or not html:
         return ""
     soup = BeautifulSoup(html, 'html.parser')
-    main_content = soup.select_one(selector)
-    if not main_content:
+    all_matches = soup.select(selector)
+    if not all_matches:
         return ""
+    # 多个匹配时，选择文本内容最多的元素（避免抓到空容器）
+    if len(all_matches) == 1:
+        main_content = all_matches[0]
+    else:
+        main_content = max(all_matches, key=lambda e: len(e.get_text(strip=True)))
     if remove_selectors:
         for sel in remove_selectors:
             for elem in main_content.select(sel):

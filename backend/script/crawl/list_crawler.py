@@ -12,7 +12,12 @@ list_crawler.py - Step 1: 采集列表页
 """
 import asyncio
 import json
+import sys
 from datetime import date
+
+# 在 import bootstrap 前解析 --type 参数（必须最早执行）
+from script.bootstrap import parse_db_arg
+sys.argv = parse_db_arg(sys.argv)
 
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 
@@ -215,36 +220,14 @@ async def _crawl_api_source(source: dict, batch_id: int, target_date) -> dict:
 
 
 if __name__ == "__main__":
-    import sys
-    import os
-    # -*- 在 import bootstrap 前解析 --db 参数 -*-
-    new_argv = []
-    skip_next = False
-    for arg in sys.argv:
-        if skip_next:
-            skip_next = False
-            continue
-        if arg == "--db":
-            # 特殊处理：--db 后面的值设置到环境变量，不传入后续解析
-            skip_next = True
-            continue
-        new_argv.append(arg)
-    if len(sys.argv) > len(new_argv):
-        # --db was present, set NEWS_DB from the removed value
-        for i, arg in enumerate(sys.argv):
-            if arg == "--db" and i + 1 < len(sys.argv):
-                os.environ["NEWS_DB"] = sys.argv[i + 1]
-                break
-    sys.argv = new_argv
-
     if len(sys.argv) > 1 and sys.argv[1] == "--learn":
-        # --learn 模式：python -m script.crawl.list_crawler --learn <url> [--db DB] [--title T] [--name N] [--skip-article] [--force-relearn]
+        # --learn 模式：python -m script.crawl.list_crawler --learn <url> [--type T] [--title T] [--name N] [--skip-article] [--force-relearn]
         from script.discovery import learn_source_config
         from script.common.urlutil import normalize_url
 
         if len(sys.argv) < 3:
             print("用法: python -m script.crawl.list_crawler --learn <url> "
-                  "[--db 数据库.db] [--title \"标题\"] [--name \"名称\"] [--skip-article] [--force-relearn]")
+                  "[--type 股市新闻|AI新闻] [--title \"标题\"] [--name \"名称\"] [--skip-article] [--force-relearn]")
             sys.exit(1)
 
         target_url = sys.argv[2]

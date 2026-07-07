@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **所有脚本开头**：`from script.bootstrap import *`
 - **数据库操作**：`from script.db import ...`（禁止直接调用 `get_conn()`）
-- **表结构定义**：`backend/script/db/schema.sql`（唯一数据源）
+- **表结构定义**：`backend/script/db/schema.sql`（primary.db，股市新闻）或 `backend/script/db/ai_news_schema.sql`（ai_news.db，AI新闻）
 - **板块归一化**：`from script.db import normalize`
 - **RAG 工作流**：generate_rag → parser → rag.save_all()
 
@@ -23,13 +23,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Python（后端）**
 - 所有脚本开头：`from script.bootstrap import *`
 - 数据库操作必须通过 `script.db` 模块，禁止直接调用 `get_conn()`
-- 表结构定义在 `backend/script/db/schema.sql` 中，是唯一数据源
+- 表结构定义在 `backend/script/db/schema.sql`（价格新闻）或 `ai_news_schema.sql`（AI新闻），是唯一数据源
 - 新增模块必须登记到 `backend/requirements.txt`
 - log 文件在 `logs/` 目录，test 文件在 `test/` 目录
+- **LLM 调用必须串行**：禁止 `asyncio.gather` / `Semaphore` 并发，所有 LLM 调用用 `for` 循环或单次 `await`
 
 **Flutter（前端）**
 - 组件通过 props/emit 或 store 通信，不直接依赖实现细节
 - 业务层调用基础设施时，必须调用对应模块，不自行实现
+
+## 多数据库支持
+
+通过 `--type` 参数切换新闻类型（统一入口）：
+- `股市新闻`（默认）：`db/primary.db`
+- `AI新闻`：`db/ai_news.db`
+
+所有采集脚本（list_crawler、news_filter、article_crawler、scorer）都支持 `--type` 参数。
+
+**统一接口**：`bootstrap.parse_db_arg(sys.argv)` 在脚本开头调用一次，之后通过 `get_db_path()` / `is_ai_news_db()` / `get_news_type()` 获取当前类型。
 
 ## 常用命令
 
@@ -48,11 +59,18 @@ python -m script.crawl.list_crawler           # 采集所有数据源列表页
 python -m script.crawl.article_crawler        # 采集所有数据源正文
 python -m script.crawl.list_crawler <url>     # 采集单个数据源
 
+# ===== AI 新闻采集 =====
+python -m script.crawl.list_crawler --type AI新闻 --learn <url> --name "AI新闻源"
+python -m script.crawl.news_filter --type AI新闻
+python -m script.crawl.article_crawler --type AI新闻
+python -m script.score.scorer --type AI新闻
+
 # ===== 统一学习（同时发现列表配置和正文配置）=====
-python -m script.crawl.list_crawler --learn <url> [--title "标题样本"] [--name "数据源名称"] [--skip-article] [--force-relearn]
+python -m script.crawl.list_crawler --learn <url> [--type 股市新闻|AI新闻] [--title "标题样本"] [--name "数据源名称"] [--skip-article] [--force-relearn]
 
 # 参数说明：
 #   --learn <url>       启动学习模式（必填）
+#   --type 类型         新闻类型：股市新闻（默认）或 AI新闻
 #   --title "标题"      已知标题，用于标题逆推定位新闻列表（可选）
 #   --name "名称"       数据源名称（可选，默认使用 URL）
 #   --skip-article      设置 list_complete=True，跳过正文抓取（可选）
@@ -118,7 +136,8 @@ backend/
 ├── script/
 │   ├── bootstrap.py        # 统一路径管理（APP_ROOT 自动推断）
 │   ├── db/                 # 数据库操作（唯一合法入口）
-│   │   ├── schema.sql      # 表结构定义（唯一定义源）
+│   │   ├── schema.sql      # 表结构定义 - primary.db（价格新闻）
+│   │   ├── ai_news_schema.sql  # 表结构定义 - ai_news.db（AI新闻）
 │   │   └── ...
 │   ├── crawl/              # 采集管道
 │   │   ├── list_crawler.py

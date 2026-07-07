@@ -12,12 +12,9 @@ import asyncio
 import sys
 from datetime import date
 
-# -*- 在 import bootstrap 前解析 --db 参数 -*-
-import os
-for i, arg in enumerate(sys.argv):
-    if arg == "--db" and i + 1 < len(sys.argv):
-        os.environ["NEWS_DB"] = sys.argv[i + 1]
-        break
+# 在 import bootstrap 前解析 --type 参数（必须最早执行）
+from script.bootstrap import parse_db_arg
+sys.argv = parse_db_arg(sys.argv)
 
 from script.bootstrap import *
 from script.crawl.crawl_config import get_crawl_config

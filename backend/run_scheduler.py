@@ -98,7 +98,7 @@ _running_tasks: dict[str, bool] = {}
 _task_lock = threading.Lock()
 
 
-def _run_task_sync(task_id: str, handler: str) -> None:
+def _run_task_sync(task_id: str, handler: str, news_type: str = "股市新闻") -> None:
     """同步执行单个任务，捕获异常不抛出让调度器继续运行"""
     # 检查任务是否已在运行，防止并发执行同一任务
     with _task_lock:
@@ -152,13 +152,14 @@ def _run_task_sync(task_id: str, handler: str) -> None:
             _running_tasks.pop(task_id, None)
 
 
-def _build_subprocess_cmd(handler: str) -> list[str]:
+def _build_subprocess_cmd(handler: str, news_type: str = "股市新闻") -> list[str]:
     """构建 subprocess.run 命令列表，匹配 schedule_service.trigger_task"""
-    # 动态获取本机 APP_ROOT，避免硬编码路径
     from script.bootstrap import APP_ROOT as _LOCAL_APP_ROOT
     _LOCAL_ROOT = str(_LOCAL_APP_ROOT).replace('\\', '/')
+    _type_env = f"NEWS_TYPE={news_type}"
     _prefix = (
-        f"import os; os.environ['APP_ROOT'] = '{_LOCAL_ROOT}'; os.chdir('{_LOCAL_ROOT}'); "
+        f"import os; os.environ['APP_ROOT'] = '{_LOCAL_ROOT}'; os.environ['NEWS_TYPE'] = '{news_type}'; "
+        f"os.chdir('{_LOCAL_ROOT}'); "
         "import sys; sys.path.insert(0, 'backend'); "
     )
     _handlers = {
@@ -173,9 +174,9 @@ def _build_subprocess_cmd(handler: str) -> list[str]:
     return [sys.executable, "-c", _handlers[handler]]
 
 
-def _run_task(task_id: str, handler: str) -> None:
+def _run_task(task_id: str, handler: str, news_type: str = "股市新闻") -> None:
     """将任务提交到线程池异步执行，不阻塞调度器"""
-    _executor.submit(_run_task_sync, task_id, handler)
+    _executor.submit(_run_task_sync, task_id, handler, news_type)
 
 
 # ============ cron 转换 ============
@@ -264,7 +265,7 @@ def _schedule_all_tasks(scheduler, tasks: list[dict]) -> None:
             scheduler.add_job(
                 _run_task,
                 trigger,
-                args=[task_id, handler],
+                args=[task_id, handler, task.get("type", "股市新闻")],
                 id=task_id,
                 replace_existing=True,
             )

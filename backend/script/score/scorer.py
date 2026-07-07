@@ -17,23 +17,16 @@ scorer.py - 新闻评分模块（批量版）
 import argparse
 import asyncio
 import json
-import os
 import re
 import sys
 import time
 from pathlib import Path
 
-# -*- 在 import bootstrap 前解析 --db 参数 -*-
-for i, arg in enumerate(sys.argv):
-    if arg == "--db" and i + 1 < len(sys.argv):
-        os.environ["NEWS_DB"] = sys.argv[i + 1]
-        break
+# 在 import bootstrap 前解析 --type 参数（必须最早执行）
+from script.bootstrap import parse_db_arg, is_ai_news_db
+sys.argv = parse_db_arg(sys.argv)
 
 from script.bootstrap import *
-
-
-def _is_ai_news_db() -> bool:
-    return "ai_news" in os.environ.get("NEWS_DB", "")
 
 
 # AI 新闻短名映射（内联于 _get_ai 使用）
@@ -48,7 +41,7 @@ from script.common.datetimeutil import now_iso, is_today
 # 路径与常量
 # ---------------------------------------------------------------------------
 
-PROMPT_FILE = PROMPT_DIR / ("AI事件评估.md" if _is_ai_news_db() else "事件评估.md")
+PROMPT_FILE = PROMPT_DIR / ("AI事件评估.md" if is_ai_news_db() else "事件评估.md")
 _CACHED_TEMPLATE: str | None = None
 
 # 批量评分质量控制：
@@ -228,10 +221,18 @@ def build_result_dict(news_meta: dict, llm_item: dict) -> dict:
     """把 LLM 单条结果 + DB 元信息组合成入库 dict（沿用旧 process_news 输出结构）。
 
     字段名通过 _get() 兼容短名（新格式）和长名（历史数据）。
+    AI新闻用 v 字段判断价值，股市新闻用 will_flunctuate 判断是否引起波动。
     """
-    will_flunctuate = _get(llm_item, "will_flunctuate", False)
-    if will_flunctuate is False:
-        return {"skipped": True, "reason": "no_fluctuation", "news_id": news_meta["news_id"]}
+    # AI 新闻：v=true 才入库
+    if is_ai_news_db():
+        is_valuable = _get(llm_item, "v", False)
+        if is_valuable is False:
+            return {"skipped": True, "reason": "no_value", "news_id": news_meta["news_id"]}
+    else:
+        # 股市新闻：will_flunctuate 才入库
+        will_flunctuate = _get(llm_item, "will_flunctuate", False)
+        if will_flunctuate is False:
+            return {"skipped": True, "reason": "no_fluctuation", "news_id": news_meta["news_id"]}
 
     normalized = normalize_sectors(_get(llm_item, "related_sectors", ""))
     result_dict = {
@@ -385,7 +386,7 @@ def commit_result(result: dict, dry_run: bool) -> str:
         log(f"  -> id={news_id} 已跳过({reason}) [OK]")
         return "skip"
     if not dry_run:
-        if _is_ai_news_db():
+        if is_ai_news_db():
             from script.db import insert_ai
             insert_ai(_build_ai_result(result))
         else:

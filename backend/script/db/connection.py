@@ -19,11 +19,11 @@ import threading
 from pathlib import Path
 from queue import Empty, Queue
 
-from script.bootstrap import DB_PATH
+from script.bootstrap import get_db_path
 
 def _get_schema_path() -> Path:
     """根据 DB_PATH 动态选择 schema 文件（每次调用实时求值）。"""
-    if "ai_news" in str(DB_PATH):
+    if "ai_news" in str(get_db_path()):
         return Path(__file__).resolve().parent / "ai_news_schema.sql"
     return Path(__file__).resolve().parent / "schema.sql"
 
@@ -40,7 +40,7 @@ def _init_pool() -> None:
             if _pool is None:
                 _pool = Queue(maxsize=_POOL_SIZE)
                 for _ in range(_POOL_SIZE):
-                    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+                    conn = sqlite3.connect(str(get_db_path()), check_same_thread=False)
                     conn.execute("PRAGMA journal_mode=WAL")
                     conn.execute("PRAGMA busy_timeout=30000")
                     _pool.put(conn)
@@ -60,7 +60,7 @@ def get_conn() -> sqlite3.Connection:
     try:
         conn = _pool.get(timeout=35)
     except Empty:
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = sqlite3.connect(str(get_db_path()))
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=30000")
         return conn
@@ -68,7 +68,7 @@ def get_conn() -> sqlite3.Connection:
         conn.execute("SELECT 1")
         return conn
     except Exception:
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = sqlite3.connect(str(get_db_path()))
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=30000")
         return conn
@@ -219,7 +219,7 @@ def init_db() -> bool:
 
     try:
         schema_sql = schema_path.read_text(encoding="utf-8")
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = sqlite3.connect(str(get_db_path()))
         conn.executescript(schema_sql)
         _migrate_columns(conn, schema_sql)
         _migrate_constraints(conn)

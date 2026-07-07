@@ -9,17 +9,14 @@ news_filter.py - Step 2: LLM 过滤（批量版）
 import asyncio
 import argparse
 import json
-import os
 import re
 import sys
 import time
 from pathlib import Path
 
-# -*- 在 import bootstrap 前解析 --db 参数 -*-
-for i, arg in enumerate(sys.argv):
-    if arg == "--db" and i + 1 < len(sys.argv):
-        os.environ["NEWS_DB"] = sys.argv[i + 1]
-        break
+# 在 import bootstrap 前解析 --type 参数（必须最早执行）
+from script.bootstrap import parse_db_arg, is_ai_news_db
+sys.argv = parse_db_arg(sys.argv)
 
 from script.bootstrap import *
 from script.crawl.crawl_config import get_crawl_config
@@ -34,8 +31,7 @@ def log(msg: str):
 
 
 def _get_filter_prompt_file() -> Path:
-    db_path = os.environ.get("NEWS_DB", "")
-    if "ai_news" in db_path:
+    if is_ai_news_db():
         return PROMPT_DIR / "AI新闻筛选.md"
     return PROMPT_DIR / "新闻筛选.md"
 
