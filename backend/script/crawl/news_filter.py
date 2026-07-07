@@ -9,6 +9,7 @@ news_filter.py - Step 2: LLM 过滤（批量版）
 import asyncio
 import argparse
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -25,7 +26,13 @@ def log(msg: str):
     _log("news_filter", msg)
 
 
-PROMPT_FILE = PROMPT_DIR / "新闻筛选.md"
+def _get_filter_prompt_file() -> Path:
+    db_path = os.environ.get("NEWS_DB", "")
+    if "ai_news" in db_path:
+        return PROMPT_DIR / "AI新闻筛选.md"
+    return PROMPT_DIR / "新闻筛选.md"
+
+PROMPT_FILE = _get_filter_prompt_file()
 _CACHED_TEMPLATE: str | None = None
 
 
