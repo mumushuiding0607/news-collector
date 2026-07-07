@@ -39,6 +39,7 @@ from .admin_db import (
     list_crawl_configs, set_crawl_config_checked, delete_crawl_config,
 )
 from .news_db import query_news, get_news_by_id, query_news_admin, query_primary_sources_admin, get_news_source_name
+from .importance_ai import insert_ai, get_recent_ai
 from .news_stocks import insert as insert_news_stocks, get_by_importance, exists as news_stocks_exists, delete_by_importance as delete_news_stocks_by_importance, get_processed_importance_ids, update_d1_d2_d3_batch, get_recent_stocks, get_recent_stocks_with_created, get_batch_by_importance  # noqa: E501
 from .subscription_db import (
     cancel_active_subscription, cancel_subscription_full,
@@ -117,4 +118,7 @@ __all__ = [
     "mark_order_expired",
     # news_stocks
     "get_batch_by_importance",
+    # importance_ai
+    "insert_ai",
+    "get_recent_ai",
 ]
