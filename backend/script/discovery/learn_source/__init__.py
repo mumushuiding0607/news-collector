@@ -44,6 +44,8 @@ def learn_source_config(
         配置字典，包含 list_config 和 content_extract
     """
     from script.discovery.list_discovery import log
+    from script.db import init_db
+    init_db()  # 确保数据库表已创建
     log(f"[统一学习] 开始学习: {name} ({url})")
     if headline:
         log(f"[统一学习] 附加标题: {headline}")

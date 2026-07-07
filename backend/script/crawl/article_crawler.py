@@ -14,6 +14,12 @@ from crawl4ai import AsyncWebCrawler, BrowserConfig
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
+# -*- 在 import bootstrap 前解析 --db 参数 -*-
+import os
+for i, arg in enumerate(sys.argv):
+    if arg == "--db" and i + 1 < len(sys.argv):
+        os.environ["NEWS_DB"] = sys.argv[i + 1]
+        break
 from script.discovery.html_cleaner import clean_article_html
 from script.bootstrap import *
 from script.crawl.crawl_config import get_source_is_flash

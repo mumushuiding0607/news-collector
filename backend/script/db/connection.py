@@ -21,7 +21,12 @@ from queue import Empty, Queue
 
 from script.bootstrap import DB_PATH
 
-SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"
+def _get_schema_path() -> Path:
+    """根据 DB_PATH 动态选择 schema 文件（每次调用实时求值）。"""
+    if "ai_news" in str(DB_PATH):
+        return Path(__file__).resolve().parent / "ai_news_schema.sql"
+    return Path(__file__).resolve().parent / "schema.sql"
+
 _POOL_SIZE = 5
 _pool: Queue = None
 _pool_lock = threading.Lock()
@@ -207,12 +212,13 @@ def init_db() -> bool:
     - 多余列：ALTER TABLE DROP COLUMN（自动清理历史遗留）
     - 缺失约束/索引：自动创建
     """
-    if not SCHEMA_PATH.exists():
-        print(f"错误: {SCHEMA_PATH} 不存在")
+    schema_path = _get_schema_path()
+    if not schema_path.exists():
+        print(f"错误: {schema_path} 不存在")
         return False
 
     try:
-        schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
+        schema_sql = schema_path.read_text(encoding="utf-8")
         conn = sqlite3.connect(str(DB_PATH))
         conn.executescript(schema_sql)
         _migrate_columns(conn, schema_sql)
