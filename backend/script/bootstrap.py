@@ -55,7 +55,7 @@ for _p in (SCRIPT_DIR, APP_ROOT_STR):
         sys.path.insert(0, _p)
 
 # 常用路径（统一基于 APP_ROOT）
-DB_PATH = APP_ROOT / "db" / "primary.db"
+DB_PATH = Path(os.environ.get("NEWS_DB", str(APP_ROOT / "db" / "primary.db")))
 LOG_DIR = APP_ROOT / "logs"
 CACHE_DIR = APP_ROOT / "backend" / "cache"
 CONFIG_DIR = APP_ROOT / "backend" / "config"
