@@ -45,6 +45,15 @@
       "enabled": true,
       "trigOnDeploy": false,
       "handler": "script.anomaly_news.summary.generate"
+    },
+    {
+      "id": "log_cleanup",
+      "name": "日志清理",
+      "description": "每天凌晨清理 7 天前的日志文件",
+      "cron": "0 3 * * *",
+      "enabled": true,
+      "trigOnDeploy": false,
+      "handler": "script.log.log_cleanup.cleanup_old_logs"
     }
   ]
 }
