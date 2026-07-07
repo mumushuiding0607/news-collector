@@ -17,11 +17,27 @@ scorer.py - 新闻评分模块（批量版）
 import argparse
 import asyncio
 import json
+import os
 import re
 import time
 from pathlib import Path
 
 from script.bootstrap import *
+
+
+def _is_ai_news_db() -> bool:
+    return "ai_news" in os.environ.get("NEWS_DB", "")
+
+
+# AI 新闻短名映射
+_SHORT_TO_LONG_AI = {
+    "s": "score",
+    "tn": "tech_novelty",
+    "m": "monetization",
+    "ad": "domains",
+    "kh": "highlights",
+    "r": "reason",
+}
 
 from script.db import get_unread, mark_scored, insert_importance
 from script.db.sectors import normalize
@@ -34,7 +50,7 @@ from script.common.datetimeutil import now_iso, is_today
 # 路径与常量
 # ---------------------------------------------------------------------------
 
-PROMPT_FILE = PROMPT_DIR / "事件评估.md"
+PROMPT_FILE = PROMPT_DIR / ("AI事件评估.md" if _is_ai_news_db() else "事件评估.md")
 _CACHED_TEMPLATE: str | None = None
 
 # 批量评分质量控制：
@@ -79,6 +95,35 @@ def _get(item: dict, long_key: str, default=None):
     if short is not None and short in item:
         return item[short]
     return item.get(long_key, default)
+
+
+def _get_ai(item: dict, long_key: str, default=None):
+    """从 LLM 返回 dict 取值：先认短名，再认长名。"""
+    short_map = {"score": "s", "tech_novelty": "tn", "monetization": "m",
+                 "domains": "ad", "highlights": "kh", "reason": "r"}
+    short = short_map.get(long_key)
+    if short is not None and short in item:
+        return item[short]
+    return item.get(long_key, default)
+
+
+def _build_ai_result(result: dict) -> dict:
+    """将通用 result 转换为 importance_ai 格式。"""
+    llm_item = result.get("_llm_item", {})
+    return {
+        "news_id": result["news_id"],
+        "source_name": result["source_name"],
+        "title": result.get("title", ""),
+        "url": result.get("url", ""),
+        "publish_time": result.get("publish_time", ""),
+        "summary": result.get("summary", ""),
+        "score": _get_ai(llm_item, "score", 0),
+        "tech_novelty": _get_ai(llm_item, "tech_novelty"),
+        "monetization": _get_ai(llm_item, "monetization", ""),
+        "domains": _get_ai(llm_item, "domains", ""),
+        "highlights": _get_ai(llm_item, "highlights", ""),
+        "reason": _get_ai(llm_item, "reason", ""),
+    }
 
 
 def log(msg: str):
@@ -191,7 +236,7 @@ def build_result_dict(news_meta: dict, llm_item: dict) -> dict:
         return {"skipped": True, "reason": "no_fluctuation", "news_id": news_meta["news_id"]}
 
     normalized = normalize_sectors(_get(llm_item, "related_sectors", ""))
-    return {
+    result_dict = {
         "skipped": False,
         "news_id": news_meta["news_id"],
         "batch_id": news_meta["batch_id"],
@@ -210,6 +255,8 @@ def build_result_dict(news_meta: dict, llm_item: dict) -> dict:
         "expectation_level": _get(llm_item, "expectation_level", ""),
         "market_mode": _get(llm_item, "market_mode", ""),
     }
+    result_dict["_llm_item"] = llm_item
+    return result_dict
 
 
 # ---------------------------------------------------------------------------
@@ -340,7 +387,11 @@ def commit_result(result: dict, dry_run: bool) -> str:
         log(f"  -> id={news_id} 已跳过({reason}) [OK]")
         return "skip"
     if not dry_run:
-        insert_importance(result)
+        if _is_ai_news_db():
+            from script.db import insert_ai
+            insert_ai(_build_ai_result(result))
+        else:
+            insert_importance(result)
         mark_scored(news_id)
     log(f"  -> id={news_id} 评分={result.get('importance_score', 0)} "
         f"板块={result.get('related_sectors', '')[:40]} [OK]")
