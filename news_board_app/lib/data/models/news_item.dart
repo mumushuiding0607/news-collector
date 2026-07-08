@@ -243,3 +243,65 @@ class SectorChange {
     required this.change,
   });
 }
+
+/// AI 新闻项
+class AiNewsItem {
+  final int id;
+  final int newsId;
+  final String sourceName;
+  final String title;
+  final String url;
+  final String publishTime;
+  final String summary;
+  final int score;
+  final int? techNovelty;
+  final String monetization;
+  final String domains;
+  final String highlights;
+  final String reason;
+  final String createdAt;
+  final String? content;
+
+  AiNewsItem({
+    required this.id,
+    required this.newsId,
+    required this.sourceName,
+    required this.title,
+    required this.url,
+    required this.publishTime,
+    required this.summary,
+    required this.score,
+    this.techNovelty,
+    required this.monetization,
+    required this.domains,
+    required this.highlights,
+    required this.reason,
+    required this.createdAt,
+    this.content,
+  });
+
+  factory AiNewsItem.fromJson(Map<String, dynamic> json) {
+    return AiNewsItem(
+      id: json['id'] as int,
+      newsId: json['news_id'] as int,
+      sourceName: json['source_name'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      url: json['url'] as String? ?? '',
+      publishTime: json['publish_time'] as String? ?? '',
+      summary: json['summary'] as String? ?? '',
+      score: (json['score'] as num?)?.toInt() ?? 0,
+      techNovelty: (json['tech_novelty'] as num?)?.toInt(),
+      monetization: json['monetization'] as String? ?? '',
+      domains: json['domains'] as String? ?? '',
+      highlights: json['highlights'] as String? ?? '',
+      reason: json['reason'] as String? ?? '',
+      createdAt: json['created_at'] as String? ?? '',
+      content: json['content'] as String?,
+    );
+  }
+
+  List<String> get domainList {
+    if (domains.isEmpty) return [];
+    return domains.split('|').where((s) => s.trim().isNotEmpty).toList();
+  }
+}

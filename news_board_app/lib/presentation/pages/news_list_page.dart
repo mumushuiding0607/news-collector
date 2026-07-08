@@ -3,7 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/config_provider.dart';
 import '../../core/providers/news_provider.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/news_type_provider.dart';
+import '../../data/models/news_item.dart';
 import '../widgets/news_card.dart';
+import '../widgets/ai_news_card.dart';
+import '../widgets/ai_news_detail_dialog.dart';
 import '../widgets/side_drawer.dart';
 
 class NewsListPage extends ConsumerStatefulWidget {
@@ -29,7 +33,16 @@ class _NewsListPageState extends ConsumerState<NewsListPage> with SingleTickerPr
       curve: Curves.easeOut,
     );
     _headerController.forward();
-    Future.microtask(() => ref.read(newsListProvider.notifier).loadNews());
+    Future.microtask(() => _loadByType());
+  }
+
+  void _loadByType() {
+    final newsType = ref.read(newsTypeProvider);
+    if (newsType == NewsType.ai) {
+      ref.read(newsListProvider.notifier).loadAiNews();
+    } else {
+      ref.read(newsListProvider.notifier).loadNews();
+    }
   }
 
   @override
@@ -42,6 +55,11 @@ class _NewsListPageState extends ConsumerState<NewsListPage> with SingleTickerPr
   Widget build(BuildContext context) {
     final config = ref.watch(configProvider);
     final theme = ref.watch(effectiveThemeProvider);
+
+    // 监听新闻类型切换，切换时重新加载
+    ref.listen(newsTypeProvider, (_, __) {
+      _loadByType();
+    });
 
     return Scaffold(
       body: Container(
@@ -232,7 +250,14 @@ class _NewsListPageState extends ConsumerState<NewsListPage> with SingleTickerPr
     if (newsState.currentNews.isEmpty) return _buildEmpty(newsState, config, theme);
 
     return RefreshIndicator(
-      onRefresh: () => ref.read(newsListProvider.notifier).refresh(),
+      onRefresh: () async {
+        final newsType = ref.read(newsTypeProvider);
+        if (newsType == NewsType.ai) {
+          await ref.read(newsListProvider.notifier).loadAiNews();
+        } else {
+          await ref.read(newsListProvider.notifier).refresh();
+        }
+      },
       color: theme.accentGoldColor,
       backgroundColor: theme.backgroundStartColor,
       child: _buildList(newsState),
@@ -264,7 +289,7 @@ class _NewsListPageState extends ConsumerState<NewsListPage> with SingleTickerPr
           Text(msg, style: TextStyle(color: theme.textSecondaryColor)),
           const SizedBox(height: 16),
           TextButton(
-            onPressed: () => ref.read(newsListProvider.notifier).loadNews(),
+            onPressed: _loadByType,
             child: Text(texts.retry, style: TextStyle(color: theme.accentGoldColor)),
           ),
         ],
@@ -295,6 +320,7 @@ class _NewsListPageState extends ConsumerState<NewsListPage> with SingleTickerPr
     final viewMode = newsState.viewMode;
     final config = ref.watch(configProvider);
     final lockConfig = config.lock;
+    final newsType = ref.watch(newsTypeProvider);
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -303,15 +329,41 @@ class _NewsListPageState extends ConsumerState<NewsListPage> with SingleTickerPr
         final isLocked = _shouldLock(i, viewMode, news, lockConfig.freeNewsLimit);
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: NewsCard(
-            news: news[i],
-            isLocked: isLocked,
-            lockTitle: lockConfig.lockTitle,
-            lockButtonLoggedIn: lockConfig.lockButtonLoggedIn,
-            lockButtonNotLoggedIn: lockConfig.lockButtonNotLoggedIn,
-          ),
+          child: _buildCard(news[i], isLocked, newsType, lockConfig),
         );
       },
+    );
+  }
+
+  Widget _buildCard(dynamic item, bool isLocked, NewsType newsType, dynamic lockConfig) {
+    if (newsType == NewsType.ai && item is AiNewsItem) {
+      return AiNewsCard(
+        news: item,
+        isLocked: isLocked,
+        onTap: isLocked ? null : () => _showAiDetail(item),
+      );
+    }
+    // 股市新闻
+    if (item is NewsItem) {
+      return NewsCard(
+        news: item,
+        isLocked: isLocked,
+        lockTitle: lockConfig.lockTitle,
+        lockButtonLoggedIn: lockConfig.lockButtonLoggedIn,
+        lockButtonNotLoggedIn: lockConfig.lockButtonNotLoggedIn,
+      );
+    }
+    return const SizedBox();
+  }
+
+  void _showAiDetail(AiNewsItem news) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '关闭',
+      barrierColor: Colors.black87,
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, _, __) => AiNewsDetailDialog(news: news),
     );
   }
 

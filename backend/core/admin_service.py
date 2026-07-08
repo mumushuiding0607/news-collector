@@ -23,6 +23,7 @@ from script.db import (
 )
 from script.db.admin_db import (
     list_crawl_configs, set_crawl_config_checked, delete_crawl_config, update_crawl_config,
+    create_crawl_config,
 )
 from script.db.primary_source import delete_by_fetched_date
 from script.db.anomaly_news import (
@@ -120,6 +121,11 @@ def update_crawl_config_service(config_id: int, name: str | None = None, url_nor
     """更新数据源配置"""
     return update_crawl_config(config_id, name=name, url_norm=url_norm, list_config=list_config,
                               content_extract=content_extract, crawl_order=crawl_order, is_flash=is_flash)
+
+
+def create_crawl_config_service(name: str, url_norm: str) -> dict:
+    """新增数据源配置"""
+    return create_crawl_config(name=name, url_norm=url_norm)
 
 
 def generate_anomaly_summary_service(date_str: str | None = None, limit: int = 200) -> dict:

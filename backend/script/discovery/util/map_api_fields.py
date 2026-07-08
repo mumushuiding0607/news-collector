@@ -37,12 +37,16 @@ def fetch_api_sample(base_url: str, analysis: dict, timeout: int = 15) -> dict:
         }
     """
     today = date.today()
-    # 把 date_format 转换为对应字符串
-    fmt = analysis['date_format']
-    today_val = format_date_by_format(today, fmt)
-
     params = dict(analysis['params'])
-    params[analysis['date_param']] = today_val
+
+    # 有日期参数时才注入日期值；无日期参数时（分页 API）直接请求第一页
+    fmt = analysis.get('date_format')
+    if fmt and analysis.get('date_param'):
+        today_val = format_date_by_format(today, fmt)
+        params[analysis['date_param']] = today_val
+    else:
+        # 无日期参数（如极客之心分页 API），直接请求第一页
+        pass
 
     resp = requests.get(base_url, params=params, timeout=timeout,
                         headers={"User-Agent": "Mozilla/5.0"})
@@ -52,7 +56,8 @@ def fetch_api_sample(base_url: str, analysis: dict, timeout: int = 15) -> dict:
 
     # 客户端兜底：扫描每个 item，找含今天日期形态的字段，保留
     today_strs = _today_string_variants(today)
-    today_strs.append(fmt)  # 也匹配 raw timestamp 等
+    if fmt:
+        today_strs.append(fmt)  # 也匹配 raw timestamp 等
     today_items = []
     for item in items:
         if not isinstance(item, dict):
@@ -98,18 +103,25 @@ def _strip_jsonp(text: str) -> str:
 
 
 def _extract_array(text: str) -> list:
-    """从响应文本里找最长的数组。"""
+    """从响应文本里找数组，优先选包含 dict 项的（article-like），其次选最长的。"""
     stripped = _strip_jsonp(text)
     try:
         obj = json.loads(stripped)
     except Exception:
         return []
 
-    best: list = []
+    best: list = []  # 最长数组
+    best_of_dicts: list = []  # 最长的由 dict 组成的数组
 
     def _walk(node):
-        nonlocal best
+        nonlocal best, best_of_dicts
         if isinstance(node, list):
+            # 检查是否由 dict 组成
+            is_dict_list = len(node) > 0 and all(isinstance(item, dict) for item in node)
+            if is_dict_list:
+                if len(node) > len(best_of_dicts):
+                    best_of_dicts = node
+            # 无论如何都更新最长数组
             if len(node) > len(best):
                 best = node
             for item in node:
@@ -119,7 +131,8 @@ def _extract_array(text: str) -> list:
                 _walk(v)
 
     _walk(obj)
-    return best
+    # 优先返回 dict 数组成员，其次返回最长数组
+    return best_of_dicts if best_of_dicts else best
 
 
 # ==================== discover_api_field_mapping ====================
@@ -170,9 +183,56 @@ def discover_api_field_mapping(items: list[dict], api_url: str, name: str = "",
     # === Stage 1: 值识别 ===
     url_field, time_field, title_field, summary_field = _detect_by_value(samples)
 
+    # === Stage 1.5: 检测值识别是否失败（图片 URL 代替了文章 URL）===
+    # 如果检测到的 url_field 是图片 URL，也应该用 LLM 重新判断
+    likely_wrong_url = False
+    slug_field = None
+    url_template = None  # 当 url_field 是 slug 时，建议的 URL 模板
+    if url_field:
+        image_pattern = re.compile(r'\.(jpg|jpeg|png|gif|webp|svg|ico)(?:\?|$)', re.IGNORECASE)
+        for item in samples[:1]:
+            v = str(item.get(url_field, ""))
+            if image_pattern.search(v):
+                likely_wrong_url = True
+                # 找 slug 字段作为候补（jiqizhixin 用 slug 做 URL 的一部分）
+                if 'slug' in item:
+                    slug_field = 'slug'
+                break
+
+    # 如果 slug_field 被选为 url_field，尝试推断 url_template
+    if slug_field and (not url_field or likely_wrong_url):
+        # 从 api_url 推断基础 URL，例如 https://www.jiqizhixin.com/api/article_library/articles.json
+        # -> https://www.jiqizhixin.com/articles/{slug}
+        from urllib.parse import urlparse
+        if api_url:
+            parsed = urlparse(api_url)
+            # 去掉 /api/.../xxx.json 部分，替换为 /{slug}
+            path_parts = parsed.path.split('/')
+            # 找 api 关键字所在位置
+            api_idx = None
+            for i, part in enumerate(path_parts):
+                if part in ('api', 'v1', 'v2', 'v3'):
+                    api_idx = i
+                    break
+            if api_idx is not None and api_idx < len(path_parts) - 1:
+                # 取 api 之后的部分作为 path 前缀
+                # 例如 api/article_library/articles.json -> /articles
+                suffix_parts = path_parts[api_idx + 1:]
+                # 去掉最后一项（通常是 xxx.json 或 xxx.jsonp）
+                if suffix_parts and ('.' in suffix_parts[-1] or suffix_parts[-1] in ('list', 'items', 'data')):
+                    suffix_parts = suffix_parts[:-1]
+                if suffix_parts:
+                    path_prefix = '/' + '/'.join(suffix_parts)
+                else:
+                    path_prefix = ''
+                url_template = f"{parsed.scheme}://{parsed.netloc}{path_prefix}/{{slug}}"
+            elif api_idx == len(path_parts) - 1:
+                # api 是最后一项，如 /api -> /{slug}
+                url_template = f"{parsed.scheme}://{parsed.netloc}/{{slug}}"
+
     # === Stage 2: LLM 补缺 ===
     missing = []
-    if not url_field:
+    if not url_field or likely_wrong_url:
         missing.append("url")
     if not time_field:
         missing.append("time")
@@ -185,8 +245,15 @@ def discover_api_field_mapping(items: list[dict], api_url: str, name: str = "",
     if missing:
         llm_mapping = _llm_complete_fields(samples, missing)
 
+    # 只有字段为 None 时才用 LLM 结果覆盖（missing 包含了 likely_wrong_url 的情况）
     if not url_field:
         url_field = llm_mapping.get("url", "")
+    elif likely_wrong_url and llm_mapping.get("url"):
+        # LLM 识别出了更好的 url 字段
+        url_field = llm_mapping.get("url", "")
+    elif likely_wrong_url and slug_field:
+        # LLM 也无法识别，用 slug 字段作为候补（配合 url_template 使用）
+        url_field = slug_field
     if not time_field:
         time_field = llm_mapping.get("time", "")
     if not title_field:
@@ -200,8 +267,14 @@ def discover_api_field_mapping(items: list[dict], api_url: str, name: str = "",
     # === 组装 list_dom_result 格式 ===
     # 取第一条作为 article 样本
     first = samples[0]
+    # 当 url_field 是 slug 等非完整 URL 时，用 url_template 构造完整 URL
+    raw_article_url = str(first.get(url_field, ""))
+    if url_template and raw_article_url:
+        article_url = url_template.format(slug=raw_article_url)
+    else:
+        article_url = raw_article_url
     article = {
-        "url": str(first.get(url_field, "")),
+        "url": article_url,
         "title": str(first.get(title_field, "")),
         "publish_time": _normalize_publish_time(first.get(time_field, "")) if time_field else "",
     }
@@ -221,6 +294,7 @@ def discover_api_field_mapping(items: list[dict], api_url: str, name: str = "",
         "publish_time_pattern": "",
         "article": article,
         "api": api_section,
+        "url_template": url_template,  # 当 url_field 是 slug 等非完整 URL 时使用
         "field_mapping": {
             "url": url_field,
             "title": title_field,
@@ -276,16 +350,25 @@ def _detect_by_value(samples: list[dict]) -> tuple[str | None, str | None, str |
     # URL 字段再优化：值以 .shtml/.html/.htm 结尾的优先
     if url_field and url_hits:
         article_ext_fields = []
+        non_image_url_fields = []
+        image_ext_pattern = re.compile(r'\.(jpg|jpeg|png|gif|webp|svg|ico)(?:\?|$)', re.IGNORECASE)
         for fname, hits in url_hits.items():
             if hits < max(1, int(n * 0.6)):
                 continue
             for item in samples[:1]:
                 v = item.get(fname, "")
-                if isinstance(v, str) and re.search(r'\.(shtml|html|htm)(?:\?|$)', v, re.IGNORECASE):
-                    article_ext_fields.append(fname)
+                if isinstance(v, str):
+                    if re.search(r'\.(shtml|html|htm)(?:\?|$)', v, re.IGNORECASE):
+                        article_ext_fields.append(fname)
+                    if not image_ext_pattern.search(v):
+                        non_image_url_fields.append(fname)
                     break
+        # 优先选有文章扩展名的，其次选非图片的
         if article_ext_fields and url_field not in article_ext_fields:
             url_field = article_ext_fields[0]
+        elif non_image_url_fields and url_field not in non_image_url_fields:
+            # 当前 url_field 是图片 URL，换成非图片的
+            url_field = non_image_url_fields[0]
 
     # 时间字段：>60% 命中，优先"不同时匹配 URL"
     time_only = {k: v for k, v in time_hits.items() if k not in url_hits}

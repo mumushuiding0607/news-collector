@@ -1,12 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/news_item.dart';
 import '../../data/repositories/news_repository.dart';
+import 'news_type_provider.dart';
 
-/// 新闻列表状态
+/// 新闻列表状态（通用类型）
 class NewsListState {
-  final List<NewsItem> hotNews;
-  final List<NewsItem> latestNews;
-  final List<NewsItem> historyNews;
+  final List<dynamic> hotNews;
+  final List<dynamic> latestNews;
+  final List<dynamic> historyNews;
   final String viewMode; // 'hot' | 'latest' | 'history'
   final String batchTime;
   final bool isLoading;
@@ -22,7 +23,7 @@ class NewsListState {
     this.errorMessage,
   });
 
-  List<NewsItem> get currentNews {
+  List<dynamic> get currentNews {
     switch (viewMode) {
       case 'hot':
         return hotNews;
@@ -36,9 +37,9 @@ class NewsListState {
   }
 
   NewsListState copyWith({
-    List<NewsItem>? hotNews,
-    List<NewsItem>? latestNews,
-    List<NewsItem>? historyNews,
+    List<dynamic>? hotNews,
+    List<dynamic>? latestNews,
+    List<dynamic>? historyNews,
     String? viewMode,
     String? batchTime,
     bool? isLoading,
@@ -76,6 +77,22 @@ class NewsListNotifier extends StateNotifier<NewsListState> {
       latestNews: all['latest'] ?? [],
       historyNews: all['history'] ?? [],
     );
+  }
+
+  /// 加载 AI 新闻
+  Future<void> loadAiNews() async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final all = await _repository.fetchAllAiNews();
+      state = state.copyWith(
+        hotNews: [], // AI 新闻暂无 hot
+        latestNews: all['latest'] ?? [],
+        historyNews: all['history'] ?? [],
+        isLoading: false,
+      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+    }
   }
 
   /// 切换视图模式

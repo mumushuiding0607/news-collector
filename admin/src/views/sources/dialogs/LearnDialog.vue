@@ -2,6 +2,7 @@
 import { ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { learnSourceAsync } from "../../../api";
+import { useNewsTypeStore } from "../../../stores/newsType";
 
 const props = defineProps<{
   visible: boolean;
@@ -15,6 +16,7 @@ const emit = defineEmits<{
 
 const form = ref({ url: "", name: "", headline: "", skipArticle: false });
 const loading = ref(false);
+const newsTypeStore = useNewsTypeStore();
 
 watch(
   () => props.visible,
@@ -44,7 +46,8 @@ async function handleSubmit() {
   }
   loading.value = true;
   try {
-    await learnSourceAsync({ url, name, headline, skip_article: skipArticle });
+    const newsType = newsTypeStore.newsType === "ai" ? "ai" : "stock";
+    await learnSourceAsync({ url, name, headline, skip_article: skipArticle, news_type: newsType });
     ElMessage.success(`学习任务已启动：${name || url}`);
     emit("started", { sourceName: name || url, logFile: "list_discovery.log" });
     emit("update:visible", false);

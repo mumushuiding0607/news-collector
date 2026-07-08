@@ -46,9 +46,19 @@ def discover_list_with_policy(
         log("[Step 1.2/2] force_relearn=True，不回退到现有配置")
         list_config, source_type, method = _run_list_discovery(url, list_html, headline, force_relearn=True)
         if list_config is None:
-            log("[统一学习] HTML LLM 学习失败，force_relearn=True，不保留已有配置")
-            # 返回 None，让 save_learned_config 失败
+            # HTML LLM 完全失败：有已有配置时保留（API 类型可能通过其他路径手动配置）
+            if existing_list_config:
+                log(f"[统一学习] HTML LLM 学习失败，保留已有配置 type={existing_list_config.get('type')}")
+                return existing_list_config, existing_list_config.get("type"), "已有配置"
+            log("[统一学习] HTML LLM 学习失败，force_relearn=True，无已有配置")
             return None, None, "学习失败"
+        # 即使 force_relearn，也要保护已有的 api 配置不被错误的 html 配置覆盖
+        # CSR 页面（机器之心等）：HTML LLM 会生成假的 html 配置，api 配置是手动验证过的
+        existing_type = existing_list_config.get("type") if existing_list_config else None
+        discovered_type = list_config.get("type") if isinstance(list_config, dict) else None
+        if existing_type == "api" and discovered_type == "html":
+            log(f"[Step 1.2/2] 已有 api 配置，新发现 html 配置不可靠，保留 api 配置")
+            return existing_list_config, "api", "已有api配置"
         return list_config, source_type, method
 
     # force_relearn=False 时的保留策略
@@ -116,15 +126,25 @@ def discover_api_with_policy(
     Returns:
         (list_config, source_type, method) 三元组，API 流失败时 list_config=None
     """
-    from script.discovery.util.find_api import find_api
+    from script.discovery.util.find_api import find_api, find_api_from_network
     from script.discovery.util.analyze_api import analyze_api_params, AnalyzeError
     from script.discovery.util.map_api_fields import fetch_api_sample, discover_api_field_mapping
 
     try:
         candidates = find_api(list_html, base_url=url, headline=headline)
     except Exception as e:
-        log(f"[Step 1.5] find_api 异常: {e}，回退到 HTML 流")
-        return None, None, None
+        log(f"[Step 1.5] find_api 异常: {e}，尝试网络监控发现")
+        candidates = None
+
+    # 正则扫描找不到候选时，尝试用 crawl4ai 监控渲染阶段的 fetch/XHR（CSR 页面）
+    if not candidates:
+        log("[Step 1.5] 正则扫描未找到 API 候选，尝试网络监控发现（CSR 页面）")
+        try:
+            import asyncio
+            candidates = asyncio.run(find_api_from_network(url, headline=headline))
+        except Exception as e:
+            log(f"[Step 1.5] find_api_from_network 异常: {e}，回退到 HTML 流")
+            candidates = None
 
     if not candidates:
         log("[Step 1.5] 未找到 API 候选，回退到 HTML 流")
@@ -230,6 +250,13 @@ def _build_api_list_config(result: dict, analysis: dict, full_url: str) -> dict:
             "date": fm.get("publish_time", "time"),  # 兼容旧 crawl_api_source
             "summary": fm.get("summary", "brief"),
         },
+        # 新格式字段（api_list.py 的 _fetch_api_items_new_format 使用）
+        "api_url": api_section.get("url", full_url),
+        "url_field": fm.get("url", "url"),
+        "url_template": result.get("url_template", ""),
+        "title_field": fm.get("title", "title"),
+        "time_field": fm.get("publish_time", "time"),
+        "summary_field": fm.get("summary", "brief"),
         "pagination": {"max_pages": 10},
     }
 

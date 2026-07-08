@@ -20,3 +20,5 @@ export const getSourcesConfig = () => api.get("/api/config/sources");
 
 export const updateSourcesConfig = (data: Record<string, unknown>) =>
   api.post("/api/config/sources", data);
+
+export const getSidebarMenu = () => api.get("/api/config/sidebar_menu");

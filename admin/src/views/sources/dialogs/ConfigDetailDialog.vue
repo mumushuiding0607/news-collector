@@ -4,6 +4,7 @@ import { ElMessage } from "element-plus";
 import { CopyDocument } from "@element-plus/icons-vue";
 import { updateCrawlConfig } from "../../../api";
 import { useMobile } from "../../../composables/useMobile";
+import { useNewsTypeStore } from "../../../stores/newsType";
 
 const props = defineProps<{
   visible: boolean;
@@ -16,6 +17,7 @@ const emit = defineEmits<{
 }>();
 
 const { isMobile } = useMobile();
+const newsTypeStore = useNewsTypeStore();
 
 const data = ref<Record<string, unknown>>({});
 const editing = ref(false);
@@ -59,6 +61,7 @@ async function copyToClipboard(text: string, successMsg: string = "已复制") {
 async function handleSave() {
   saving.value = true;
   try {
+    const newsType = newsTypeStore.newsType === "ai" ? "ai" : "stock";
     await updateCrawlConfig(data.value.id as number, {
       name: form.value.name,
       url_norm: form.value.url_norm,
@@ -66,7 +69,7 @@ async function handleSave() {
       content_extract: form.value.content_extract,
       crawl_order: form.value.crawl_order,
       is_flash: form.value.is_flash,
-    });
+    }, newsType);
     ElMessage.success("保存成功");
     editing.value = false;
     emit("saved");
@@ -82,7 +85,8 @@ async function toggleFlash() {
   const next = data.value.is_flash ? 0 : 1;
   togglingFlash.value = true;
   try {
-    await updateCrawlConfig(data.value.id as number, { is_flash: next });
+    const newsType = newsTypeStore.newsType === "ai" ? "ai" : "stock";
+    await updateCrawlConfig(data.value.id as number, { is_flash: next }, newsType);
     data.value.is_flash = next;
     form.value.is_flash = next;
     ElMessage.success(next ? "已设为快讯" : "已取消快讯");

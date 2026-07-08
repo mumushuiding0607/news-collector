@@ -232,6 +232,40 @@ def get_news_history(request: Request, days: int = 3):
     return {"data": sorted_data, "count": len(sorted_data)}
 
 
+# ============ AI 新闻端点 ============
+AI_LATEST_CACHE = _CACHE_DIR / "ai_news_latest.json"
+AI_HISTORY_CACHE = _CACHE_DIR / "ai_news_history.json"
+
+
+@router.get("/news/ai/latest")
+def get_ai_news_latest(request: Request):
+    """获取 AI 新闻最新缓存"""
+    result = _load_cached_json(AI_LATEST_CACHE)
+    if not result:
+        return {"data": [], "count": 0}
+    return {"data": result, "count": len(result)}
+
+
+@router.get("/news/ai/history")
+def get_ai_news_history(request: Request):
+    """获取 AI 新闻历史"""
+    result = _load_cached_json(AI_HISTORY_CACHE)
+    if not result:
+        return {"data": [], "count": 0}
+    return {"data": result, "count": len(result)}
+
+
+@router.get("/news/ai/all")
+def get_ai_news_all(request: Request):
+    """一次性返回 AI 新闻 latest + history（全部从缓存读取）"""
+    latest_raw = _load_cached_json(AI_LATEST_CACHE) or []
+    history_raw = _load_cached_json(AI_HISTORY_CACHE) or []
+    return {
+        "latest": {"data": latest_raw, "count": len(latest_raw)},
+        "history": {"data": history_raw, "count": len(history_raw)},
+    }
+
+
 @router.get("/news")
 def get_news(request: Request):
     """获取最新批次的高分新闻"""
@@ -363,7 +397,7 @@ def learn_news_source(request: Request, url: str, name: str = "", headline: str 
 
 
 @router.get("/news/learn_async")
-def learn_news_source_async(request: Request, url: str, name: str = "", headline: str = "", skip_article: bool = False):
+def learn_news_source_async(request: Request, url: str, name: str = "", headline: str = "", skip_article: bool = False, news_type: str = "stock"):
     """
     异步学习接口：立即返回，后台执行学习。
 
@@ -378,6 +412,8 @@ def learn_news_source_async(request: Request, url: str, name: str = "", headline
     source_name = name or url
 
     def _run():
+        from script.bootstrap import set_news_type
+        set_news_type("AI新闻" if news_type == "ai" else "股市新闻")
         try:
             learn_source_config(
                 url=url,
@@ -394,12 +430,15 @@ def learn_news_source_async(request: Request, url: str, name: str = "", headline
 
 
 @router.get("/news/fetch")
-async def fetch_news_by_url(request: Request, url: str, limit: int = 10):
+async def fetch_news_by_url(request: Request, url: str, limit: int = 10, news_type: str = "stock"):
     """
     通过已学习的数据源 URL 获取新闻列表。
     复用 list_crawler 的提取逻辑，不入库。
     """
     from script.log import log as _log
+    from script.bootstrap import set_news_type
+
+    set_news_type("AI新闻" if news_type == "ai" else "股市新闻")
 
     _log("fetch", f"[Fetch] 开始抓取: {url}, limit={limit}")
 
@@ -506,7 +545,7 @@ async def fetch_news_by_url(request: Request, url: str, limit: int = 10):
 
 
 @router.get("/news/fetch_async")
-def fetch_news_async(request: Request, url: str, limit: int = 10):
+def fetch_news_async(request: Request, url: str, limit: int = 10, news_type: str = "stock"):
     """
     异步抓取接口：立即返回，后台执行抓取。
     """
@@ -517,6 +556,8 @@ def fetch_news_async(request: Request, url: str, limit: int = 10):
     from script.crawl.news_list.html_list import extract_article_links_with_dates
 
     def _run():
+        from script.bootstrap import set_news_type
+        set_news_type("AI新闻" if news_type == "ai" else "股市新闻")
         try:
             src = get_crawl_config_by_url(url)
             if not src:
@@ -914,12 +955,3 @@ def run_anomaly_source_pipeline_step(request: Request, step: int = Query(..., ge
     import threading
     threading.Thread(target=_run, daemon=True).start()
     return {"ok": True, "step": step, "name": name, "desc": desc, "message": f"数据源步骤 Step {step} 已触发"}
-    def _run():
-        from script.log import init_log
-        init_log()
-        from script.anomaly_news.pipeline import _run_pipeline, PIPELINE_NEWS
-        _run_pipeline(PIPELINE_NEWS, "消息流水线")
-
-    import threading
-    threading.Thread(target=_run, daemon=True).start()
-    return {"ok": True, "message": "消息流水线已触发"}

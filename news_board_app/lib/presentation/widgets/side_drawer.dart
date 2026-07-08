@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/config_provider.dart';
+import '../../core/providers/news_type_provider.dart';
 import 'feedback_dialog.dart';
 import 'summary_dialog.dart';
 
@@ -18,6 +19,7 @@ class SideDrawer extends ConsumerWidget {
     final config = ref.watch(configProvider);
     final theme = ref.watch(effectiveThemeConfigProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final newsType = ref.watch(newsTypeProvider);
     final isDark = themeMode == AppThemeMode.dark;
     final uiTexts = config.uiTexts.sideDrawer;
     final features = config.features;
@@ -45,6 +47,8 @@ class SideDrawer extends ConsumerWidget {
               controller: scrollController,
               shrinkWrap: true,
               children: [
+                _buildNewsTypeTree(context, ref, newsType, menuIconColor, menuTextColor, textMuted),
+                const Divider(height: 1),
                 _buildMenuItem(context, Icons.summarize_outlined, uiTexts.briefing, menuIconColor, menuTextColor, () {
                   Navigator.pop(context);
                   showGeneralDialog(
@@ -196,6 +200,77 @@ class SideDrawer extends ConsumerWidget {
     return ListTile(
       leading: Icon(icon, color: iconColor, size: 22),
       title: Text(label, style: TextStyle(color: textColor, fontSize: 15)),
+      onTap: onTap,
+      contentPadding: const EdgeInsets.only(left: 4, right: 8),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
+  Widget _buildNewsTypeTree(BuildContext context, WidgetRef ref, NewsType currentType, Color iconColor, Color textColor, Color textSecondary) {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        leading: Icon(Icons.article_outlined, color: iconColor, size: 22),
+        title: Text('新闻类型', style: TextStyle(color: textColor, fontSize: 15)),
+        tilePadding: const EdgeInsets.only(left: 4, right: 8),
+        childrenPadding: const EdgeInsets.only(left: 48),
+        expandedAlignment: Alignment.centerLeft,
+        children: [
+          _buildTreeItem(
+            context, ref,
+            icon: Icons.show_chart,
+            label: '股市新闻',
+            selected: currentType == NewsType.stock,
+            iconColor: Colors.green,
+            onTap: () {
+              if (currentType != NewsType.stock) {
+                ref.read(newsTypeProvider.notifier).setNewsType(NewsType.stock);
+              }
+            },
+            textColor: textColor,
+            textSecondary: textSecondary,
+          ),
+          _buildTreeItem(
+            context, ref,
+            icon: Icons.smart_toy_outlined,
+            label: 'AI新闻',
+            selected: currentType == NewsType.ai,
+            iconColor: Colors.purple,
+            onTap: () {
+              if (currentType != NewsType.ai) {
+                ref.read(newsTypeProvider.notifier).setNewsType(NewsType.ai);
+              }
+            },
+            textColor: textColor,
+            textSecondary: textSecondary,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTreeItem(
+    BuildContext context,
+    WidgetRef ref, {
+    required IconData icon,
+    required String label,
+    required bool selected,
+    required Color iconColor,
+    required VoidCallback onTap,
+    required Color textColor,
+    required Color textSecondary,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: selected ? iconColor : iconColor.withOpacity(0.5), size: 20),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: selected ? textColor : textSecondary,
+          fontSize: 14,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+      trailing: selected ? Icon(Icons.check, color: iconColor, size: 18) : null,
       onTap: onTap,
       contentPadding: const EdgeInsets.only(left: 4, right: 8),
       visualDensity: VisualDensity.compact,

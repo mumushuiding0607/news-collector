@@ -3,10 +3,12 @@ import { ref, onMounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { getCrawlConfigs, confirmCrawlConfig, unconfirmCrawlConfig, deleteCrawlConfig } from "../../api";
 import { useMobile } from "../../composables/useMobile";
+import { useNewsTypeStore } from "../../stores/newsType";
 import ConfigDetailDialog from "./dialogs/ConfigDetailDialog.vue";
 import MobileConfigCard from "./dialogs/MobileConfigCard.vue";
 
 const { isMobile } = useMobile();
+const newsTypeStore = useNewsTypeStore();
 
 const data = ref<Record<string, unknown>[]>([]);
 const loading = ref(false);
@@ -25,9 +27,11 @@ const emit = defineEmits<{
 async function fetchData() {
   loading.value = true;
   try {
+    const newsType = newsTypeStore.newsType === "ai" ? "ai" : "stock";
     const params: Record<string, unknown> = {
       page: pagination.value.page,
       limit: pagination.value.limit,
+      news_type: newsType,
     };
     if (filterChecked.value !== "") {
       params.checked = filterChecked.value;
@@ -44,7 +48,8 @@ async function fetchData() {
 
 async function handleConfirm(id: number) {
   try {
-    await confirmCrawlConfig(id);
+    const newsType = newsTypeStore.newsType === "ai" ? "ai" : "stock";
+    await confirmCrawlConfig(id, newsType);
     ElMessage.success("已确认");
     fetchData();
   } catch {
@@ -54,7 +59,8 @@ async function handleConfirm(id: number) {
 
 async function handleUnconfirm(id: number) {
   try {
-    await unconfirmCrawlConfig(id);
+    const newsType = newsTypeStore.newsType === "ai" ? "ai" : "stock";
+    await unconfirmCrawlConfig(id, newsType);
     ElMessage.success("已取消确认");
     fetchData();
   } catch {
@@ -65,7 +71,8 @@ async function handleUnconfirm(id: number) {
 async function handleDelete(id: number) {
   try {
     await ElMessageBox.confirm("确认删除该数据源？", "删除确认", { type: "warning" });
-    await deleteCrawlConfig(id);
+    const newsType = newsTypeStore.newsType === "ai" ? "ai" : "stock";
+    await deleteCrawlConfig(id, newsType);
     ElMessage.success("删除成功");
     fetchData();
   } catch {
@@ -84,6 +91,8 @@ function handleFilterChange() {
 }
 
 onMounted(fetchData);
+
+defineExpose({ refresh: fetchData });
 </script>
 
 <template>

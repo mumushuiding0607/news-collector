@@ -159,10 +159,9 @@ def reject_subscription(user_id: int, reason: str = "") -> dict:
 
 def list_crawl_configs(checked: int | None = None, page: int = 1, limit: int = 50) -> dict:
     """分页查询 source_crawl_configs"""
-    # 使用独立连接避免连接池多 worker 场景下读到 stale 数据
     import sqlite3
-    from script.bootstrap import DB_PATH
-    conn = sqlite3.connect(str(DB_PATH))
+    from script.bootstrap import get_db_path
+    conn = sqlite3.connect(str(get_db_path()))
     try:
         conn.execute("PRAGMA journal_mode=WAL")
         conditions = ["1=1"]
@@ -199,12 +198,24 @@ def list_crawl_configs(checked: int | None = None, page: int = 1, limit: int = 5
         conn.close()
 
 
+def list_crawl_config_names() -> list[str]:
+    """获取所有不重复的数据源名称（只查 name 列，轻量）"""
+    import sqlite3
+    from script.bootstrap import get_db_path
+    conn = sqlite3.connect(str(get_db_path()))
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        rows = conn.execute("SELECT DISTINCT name FROM source_crawl_configs WHERE name IS NOT NULL AND name != '' ORDER BY name").fetchall()
+        return [r[0] for r in rows]
+    finally:
+        conn.close()
+
+
 def set_crawl_config_checked(config_id: int, checked: int) -> dict:
     """设置 checked 状态"""
-    # 直接使用独立连接，绕过连接池，避免多 worker 场景下读到 stale 数据
     import sqlite3
-    from script.bootstrap import DB_PATH
-    conn = sqlite3.connect(str(DB_PATH))
+    from script.bootstrap import get_db_path
+    conn = sqlite3.connect(str(get_db_path()))
     try:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute(
@@ -217,15 +228,49 @@ def set_crawl_config_checked(config_id: int, checked: int) -> dict:
         conn.close()
 
 
-def delete_crawl_config(config_id: int) -> dict:
+def delete_crawl_configs_record(config_id: int) -> dict:
     """删除 source_crawl_configs 记录"""
-    conn = get_conn()
+    import sqlite3
+    from script.bootstrap import get_db_path
+    conn = sqlite3.connect(str(get_db_path()))
     try:
+        conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("DELETE FROM source_crawl_configs WHERE id = ?", (config_id,))
         conn.commit()
         return {"ok": True}
     finally:
-        put_conn(conn)
+        conn.close()
+
+
+def delete_crawl_config(config_id: int) -> dict:
+    """删除 source_crawl_configs 记录（兼容别名）"""
+    return delete_crawl_configs_record(config_id)
+
+
+def create_crawl_config(name: str, url_norm: str) -> dict:
+    """新增数据源配置（插入 url_norm + name，返回新记录）"""
+    import sqlite3
+    from script.bootstrap import get_db_path
+    from script.common.urlutil import normalize_url
+    conn = sqlite3.connect(str(get_db_path()))
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        norm = normalize_url(url_norm)
+        # 查重
+        existing = conn.execute(
+            "SELECT id FROM source_crawl_configs WHERE url_norm = ?", (norm,)
+        ).fetchone()
+        if existing:
+            return {"ok": False, "error": "该 URL 已存在"}
+        conn.execute(
+            "INSERT INTO source_crawl_configs (url_norm, name, checked) VALUES (?, ?, 0)",
+            (norm, name),
+        )
+        conn.commit()
+        new_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        return {"ok": True, "id": new_id, "url_norm": norm, "name": name}
+    finally:
+        conn.close()
 
 
 def update_crawl_config(config_id: int, name: str | None = None, url_norm: str | None = None,
@@ -233,8 +278,8 @@ def update_crawl_config(config_id: int, name: str | None = None, url_norm: str |
                         crawl_order: int | None = None, is_flash: int | None = None) -> dict:
     """更新 source_crawl_configs 记录"""
     import sqlite3
-    from script.bootstrap import DB_PATH
-    conn = sqlite3.connect(str(DB_PATH))
+    from script.bootstrap import get_db_path
+    conn = sqlite3.connect(str(get_db_path()))
     try:
         conn.execute("PRAGMA journal_mode=WAL")
         fields = []

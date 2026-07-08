@@ -18,6 +18,7 @@ from backend.core.admin_service import (
     get_crawl_configs_service,
     confirm_crawl_config_service, unconfirm_crawl_config_service,
     remove_crawl_config_service, update_crawl_config_service,
+    create_crawl_config_service,
     generate_anomaly_summary_service,
     get_anomaly_news_service,
     delete_anomaly_news_service,
@@ -134,42 +135,65 @@ def reject_user_subscription(request: Request, user_id: int, body: RejectRequest
 # ============ source_crawl_configs 管理 ============
 
 
+class CreateCrawlConfigRequest(BaseModel):
+    name: str
+    url_norm: str
+
+
+@router.post("/crawl-configs")
+def create_crawl_config(request: Request, body: CreateCrawlConfigRequest, news_type: str = "stock"):
+    """新增数据源配置"""
+    require_admin(request)
+    from script.bootstrap import set_news_type
+    set_news_type("AI新闻" if news_type == "ai" else "股市新闻")
+    return create_crawl_config_service(name=body.name, url_norm=body.url_norm)
+
+
 @router.get("/crawl-configs")
-def list_crawl_configs(request: Request, checked: int | None = None, page: int = 1, limit: int = 50):
+def list_crawl_configs(request: Request, checked: int | None = None, page: int = 1, limit: int = 50,
+                      news_type: str = "stock"):
     """分页查询数据源配置（checked: 0=未确认, 1=已确认, None=全部）"""
     require_admin(request)
+    from script.bootstrap import set_news_type
+    set_news_type("AI新闻" if news_type == "ai" else "股市新闻")
     return get_crawl_configs_service(checked=checked, page=page, limit=limit)
 
 
 @router.get("/crawl-configs/source_names")
-def list_source_names(request: Request):
+def list_source_names(request: Request, news_type: str = "stock"):
     """获取所有数据源名称列表（用于筛选）"""
     require_admin(request)
-    from script.db.admin_db import list_crawl_configs
-    configs = list_crawl_configs(checked=None, page=1, limit=1000)
-    names = list({c["name"] for c in configs.get("items", []) if c.get("name")})
-    names.sort()
+    from script.bootstrap import set_news_type
+    set_news_type("AI新闻" if news_type == "ai" else "股市新闻")
+    from script.db.admin_db import list_crawl_config_names
+    names = list_crawl_config_names()
     return {"source_names": names}
 
 
 @router.post("/crawl-configs/{config_id}/confirm")
-def confirm_crawl_config(request: Request, config_id: int):
+def confirm_crawl_config(request: Request, config_id: int, news_type: str = "stock"):
     """确认数据源配置（checked=1）"""
     require_admin(request)
+    from script.bootstrap import set_news_type
+    set_news_type("AI新闻" if news_type == "ai" else "股市新闻")
     return confirm_crawl_config_service(config_id)
 
 
 @router.post("/crawl-configs/{config_id}/unconfirm")
-def unconfirm_crawl_config(request: Request, config_id: int):
+def unconfirm_crawl_config(request: Request, config_id: int, news_type: str = "stock"):
     """取消确认数据源配置（checked=0）"""
     require_admin(request)
+    from script.bootstrap import set_news_type
+    set_news_type("AI新闻" if news_type == "ai" else "股市新闻")
     return unconfirm_crawl_config_service(config_id)
 
 
 @router.delete("/crawl-configs/{config_id}")
-def delete_crawl_config(request: Request, config_id: int):
+def delete_crawl_config(request: Request, config_id: int, news_type: str = "stock"):
     """删除数据源配置"""
     require_admin(request)
+    from script.bootstrap import set_news_type
+    set_news_type("AI新闻" if news_type == "ai" else "股市新闻")
     return remove_crawl_config_service(config_id)
 
 
@@ -183,9 +207,11 @@ class UpdateCrawlConfigRequest(BaseModel):
 
 
 @router.put("/crawl-configs/{config_id}")
-def update_crawl_config(request: Request, config_id: int, body: UpdateCrawlConfigRequest):
+def update_crawl_config(request: Request, config_id: int, body: UpdateCrawlConfigRequest, news_type: str = "stock"):
     """更新数据源配置"""
     require_admin(request)
+    from script.bootstrap import set_news_type
+    set_news_type("AI新闻" if news_type == "ai" else "股市新闻")
     return update_crawl_config_service(
         config_id,
         name=body.name,

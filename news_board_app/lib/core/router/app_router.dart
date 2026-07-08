@@ -6,6 +6,7 @@ import '../../presentation/pages/register_page.dart';
 import '../../presentation/pages/subscription_page.dart';
 import '../../presentation/pages/account_page.dart';
 import '../../presentation/pages/download_page.dart';
+import '../../presentation/pages/webview_page.dart';
 import '../utils/api_client.dart';
 
 final appRouter = GoRouter(
@@ -36,47 +37,13 @@ final appRouter = GoRouter(
       path: '/download',
       builder: (context, state) => const DownloadPage(),
     ),
+    GoRoute(
+      path: '/webview',
+      builder: (context, state) {
+        final url = state.uri.queryParameters['url'] ?? '';
+        final title = state.uri.queryParameters['title'] ?? '网页';
+        return WebViewPage(url: url, title: title);
+      },
+    ),
   ],
 );
-
-/// 路由映射表
-final _routeMap = <String, Widget Function()>{
-  '/': () => const NewsListPage(),
-  '/login': () => const LoginPage(),
-  '/register': () => const RegisterPage(),
-  '/subscribe': () => const SubscriptionPage(),
-  '/account': () => const AccountPage(),
-  '/download': () => const DownloadPage(),
-};
-
-/// 根据路由设置生成页面
-Route<dynamic>? generateRoute(RouteSettings settings) {
-  final name = settings.name ?? '/';
-  final builder = _routeMap[name];
-  if (builder != null) {
-    return MaterialPageRoute(builder: (_) => builder());
-  }
-  // 未知路由返回 404
-   return MaterialPageRoute(
-    builder: (ctx) => Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('404', style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            const Text('页面不存在', style: TextStyle(fontSize: 18)),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () => Navigator.of(ctx).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const NewsListPage()),
-                (_) => false,
-              ),
-              child: const Text('返回首页'),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}

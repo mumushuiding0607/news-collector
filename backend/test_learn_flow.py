@@ -28,7 +28,7 @@ from script.discovery.util.html_fetch import (
     DEFAULT_ARTICLE_WAIT,
 )
 from script.common.datetimeutil import DATETIME_REGEX
-from script.discovery.util.find_api import find_api
+from script.discovery.util.find_api import find_api, find_api_from_network
 from script.discovery.util.analyze_api import analyze_api_params, AnalyzeError
 from script.discovery.util.map_api_fields import (
     fetch_api_sample,
@@ -304,6 +304,15 @@ def main():
                 with open(step_paths[1], 'r', encoding='utf-8') as f:
                     list_html = f.read()
                 candidates = find_api(list_html, base_url=url, headline=headline)
+                # 正则扫描找不到候选时，尝试用 crawl4ai 监控渲染阶段的 fetch/XHR（CSR 页面）
+                if not candidates:
+                    print(f"[Step 1.5] 正则扫描未找到 API 候选，尝试网络监控发现（CSR 页面）")
+                    try:
+                        import asyncio
+                        candidates = asyncio.run(find_api_from_network(url, headline=headline))
+                    except Exception as e:
+                        print(f"[Step 1.5] find_api_from_network 异常: {e}，回退到 HTML 流")
+                        candidates = None
                 if candidates:
                     print(f"[Step 1.5] 找到 {len(candidates)} 个 API 候选，走 API 流")
                     api_dir = TEST_DIR / "list_api"

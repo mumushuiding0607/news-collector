@@ -11,6 +11,10 @@ find_api.py - 从列表页 HTML 中发现候选 API 端点
      c) 数组项含时间字段（值匹配日期/时间戳形态）
      d) 数组项含 >10 字中文字段（标题）
 
+新增：对于纯 CSR/JS 渲染页面，find_api_from_network 用 crawl4ai
+     的 capture_network_requests 监控渲染阶段的 fetch/XHR 调用，
+     捕获 HTML 正则扫不到的动态 API。
+
 返回通过验证的候选列表（按规则匹配度排序）。
 """
 import json
@@ -19,6 +23,113 @@ from html import unescape
 from typing import Any
 from urllib.parse import urlparse, parse_qs, urljoin
 import requests
+
+
+# ==================== 网络监控发现（CSR 页面）====================
+
+
+async def find_api_from_network(url: str, headline: str = "", test_timeout: int = 10) -> list[dict]:
+    """
+    对于纯 CSR/JS 渲染页面，用 crawl4ai 监控渲染阶段的 fetch/XHR 调用来发现 API。
+
+    适用于：React/Vue CSR 页面，API 调用不在 HTML 源码里。
+
+    Args:
+        url: 列表页 URL
+        headline: 已知文章标题（用于消歧）
+        test_timeout: 单个 API 测试请求超时（秒）
+
+    Returns:
+        通过验证的候选列表，格式同 find_api。
+    """
+    try:
+        from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
+    except ImportError:
+        return []
+
+    # 等待 article-card 出现（常见 CSR 新闻列表的 DOM 标志）
+    wait_selector = 'js:() => document.querySelectorAll("div.article-card,div.news-item,div.list-item,.article-list").length >= 3'
+
+    async with AsyncWebCrawler(config=BrowserConfig(headless=True, verbose=False)) as crawler:
+        result = await crawler.arun(
+            url=url,
+            config=CrawlerRunConfig(
+                wait_for=wait_selector,
+                page_timeout=30000,
+                verbose=False,
+                capture_network_requests=True,
+            ),
+        )
+
+    # 提取 fetch/XHR 请求
+    network_requests = getattr(result, "network_requests", []) or []
+    if hasattr(result, "results") and result.results:
+        network_requests = getattr(result.results[0], "network_requests", []) or []
+
+    api_urls = set()
+    for req in network_requests:
+        resource_type = req.get("resource_type", "")
+        event_type = req.get("event_type", "")
+        req_url = req.get("url", "")
+
+        # 只看 fetch/XHR 类型的请求
+        if event_type not in ("request", "fetch", "xhr") and resource_type not in ("fetch", "xhr", "websocket"):
+            continue
+        if not req_url or req_url.startswith("data:") or req_url.startswith("blob:"):
+            continue
+        # 过滤明显非 API 的 URL
+        if _is_blacklisted(req_url) or not _looks_like_api(req_url):
+            continue
+        api_urls.add(req_url)
+
+    if not api_urls:
+        return []
+
+    # 验证每个候选
+    validated = []
+    for api_url in sorted(api_urls):
+        try:
+            result = _test_candidate(api_url, test_timeout)
+        except Exception:
+            continue
+        if result is None:
+            continue
+        url_field = result.get("url_field")
+        time_field = result.get("time_field")
+        title_fields = result.get("title_fields", [])
+        if not (url_field and time_field and title_fields):
+            continue
+
+        parsed = urlparse(api_url)
+        params = parse_qs(parsed.query)
+        params_flat = {k: v[0] if len(v) == 1 else v for k, v in params.items()}
+
+        validated.append({
+            "url": api_url.split("?")[0],
+            "method": "GET",
+            "params": params_flat,
+            "sample_count": result["sample_count"],
+            "url_field": url_field,
+            "time_field": time_field,
+            "title_fields": title_fields,
+            "summary_fields": result.get("summary_fields", []),
+        })
+
+    if not validated:
+        return []
+
+    # 消歧
+    if headline and len(validated) > 1:
+        for v in validated:
+            try:
+                resp = requests.get(v["url"], params=v["params"], timeout=test_timeout)
+                if headline in resp.text:
+                    return [v]
+            except Exception:
+                continue
+
+    validated.sort(key=lambda x: x["sample_count"], reverse=True)
+    return validated
 
 
 # ==================== URL 候选提取 ====================

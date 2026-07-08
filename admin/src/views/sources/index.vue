@@ -6,6 +6,7 @@ import FetchDialog from "./dialogs/FetchDialog.vue";
 import FetchResultDialog from "./dialogs/FetchResultDialog.vue";
 import ArticleDialog from "./dialogs/ArticleDialog.vue";
 import AnomalyDialog from "./dialogs/AnomalyDialog.vue";
+import AddSourceDialog from "./dialogs/AddSourceDialog.vue";
 import LogViewer from "../../components/LogViewer.vue";
 
 const activeTab = ref("configs");
@@ -35,6 +36,9 @@ const articleRow = ref<Record<string, unknown> | null>(null);
 // 异动弹窗
 const anomalyVisible = ref(false);
 const anomalySourceName = ref("");
+
+// 新增数据源弹窗
+const addVisible = ref(false);
 
 function openLearn(row?: Record<string, unknown>) {
   learnRow.value = row || null;
@@ -68,15 +72,21 @@ function onLearnStarted(payload: { sourceName: string; logFile: string }) {
   logViewerFile.value = payload.logFile;
   logViewerVisible.value = true;
 }
+
+const listRef = ref<{ refresh: () => void } | null>(null);
 </script>
 
 <template>
   <div>
-    <h2 style="color: var(--text-h); margin-bottom: 20px">数据源配置管理</h2>
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px">
+      <h2 style="color: var(--text-h); margin: 0">数据源配置管理</h2>
+      <el-button type="primary" @click="addVisible = true">新增数据源</el-button>
+    </div>
 
     <el-tabs v-model="activeTab">
       <el-tab-pane label="数据源配置" name="configs">
         <SourcesConfigList
+          ref="listRef"
           @learn="openLearn"
           @fetch="openFetch"
           @anomaly="openAnomaly"
@@ -112,6 +122,11 @@ function onLearnStarted(payload: { sourceName: string; logFile: string }) {
     <AnomalyDialog
       v-model:visible="anomalyVisible"
       :source-name="anomalySourceName"
+    />
+
+    <AddSourceDialog
+      v-model:visible="addVisible"
+      @added="() => listRef.value?.refresh()"
     />
 
     <LogViewer

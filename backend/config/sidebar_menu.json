@@ -1,0 +1,29 @@
+{
+  "default": "stock",
+  "newsTypes": {
+    "stock": {
+      "label": "股市新闻",
+      "icon": "TrendingUp",
+      "modules": [
+        { "path": "/dashboard", "label": "控制台", "icon": "Monitor" },
+        { "path": "/news", "label": "新闻管理", "icon": "Document" },
+        { "path": "/anomaly", "label": "异动消息", "icon": "Lightning" },
+        { "path": "/users", "label": "用户管理", "icon": "User" },
+        { "path": "/subscriptions", "label": "订阅管理", "icon": "Tickets" },
+        { "path": "/comments", "label": "评论管理", "icon": "ChatLineSquare" },
+        { "path": "/sources", "label": "数据源配置管理", "icon": "Link" },
+        { "path": "/config", "label": "后台配置", "icon": "Tools" },
+        { "path": "/schedule", "label": "定时任务", "icon": "Timer" },
+        { "path": "/logs", "label": "日志管理", "icon": "DocumentCopy" }
+      ]
+    },
+    "ai": {
+      "label": "AI新闻",
+      "icon": "Cpu",
+      "modules": [
+        { "path": "/news", "label": "新闻管理", "icon": "Document" },
+        { "path": "/sources", "label": "数据源配置管理", "icon": "Link" }
+      ]
+    }
+  }
+}

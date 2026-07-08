@@ -71,6 +71,10 @@ def crawl_api_source(source: dict, batch_id: int, target_date: date | None = Non
 def fetch_api_items(source: dict, target_date: date | None = None) -> list[dict]:
     """从 API 数据源拉取当天 items（不写入数据库），供 /api/news/fetch 等预览接口使用。
 
+    支持两种配置格式：
+    - 新格式（api_url + url_field/title_field/...）：直接字段名提取，url_template 构造 URL
+    - 旧格式（endpoint + field_mapping）：通过 field_mapping 映射字段
+
     Returns:
         list[dict]，每个 dict 含 title/url/summary/date（与 _crawl_generic_api 入库前一致）。
     """
@@ -83,10 +87,105 @@ def fetch_api_items(source: dict, target_date: date | None = None) -> list[dict]
     if not list_config:
         return []
 
-    endpoint = list_config.get("endpoint", "")
-    if not endpoint:
+    # 区分新旧格式：新格式用 api_url，旧格式用 endpoint
+    api_url = list_config.get("api_url") or list_config.get("endpoint", "")
+    if not api_url:
+        log(f"{name}: 无 api_url/endpoint")
         return []
 
+    is_new_format = bool(list_config.get("api_url"))
+
+    if is_new_format:
+        return _fetch_api_items_new_format(source, target_date, list_config)
+    else:
+        return _fetch_api_items_old_format(source, target_date, list_config)
+
+
+def _fetch_api_items_new_format(source: dict, target_date: date | None, list_config: dict) -> list[dict]:
+    """新格式 API 采集：api_url + url_field/url_template + 各字段名直接提取"""
+    name = source.get("name", source.get("config_name", "未知数据源"))
+    api_url = list_config["api_url"]
+    url_template = list_config.get("url_template", "")
+    url_field = list_config.get("url_field", "url")
+    title_field = list_config.get("title_field", "title")
+    time_field = list_config.get("time_field", "publishedAt")
+    content_field = list_config.get("content_field", "content")
+    page_param = list_config.get("page_param", "page")
+    per_param = list_config.get("per_param", "per")
+    per_default = list_config.get("per_default", 20)
+    date_format = list_config.get("date_format", "YYYY/MM/DD HH:mm")
+
+    if target_date is None:
+        target_date = date.today()
+
+    # 构建初始参数（去掉日期过滤，机器之心 API 不支持日期参数）
+    params = {}
+    if per_param:
+        params[per_param] = per_default
+
+    all_items = []
+    page = 1
+    max_pages = list_config.get("max_pages", 5)
+
+    while page <= max_pages:
+        params = dict(params)
+        params[page_param] = page
+        data = _fetch_api_page(api_url, params)
+        if not data:
+            break
+
+        # 新格式：直接在顶层 articles 数组
+        items = data if isinstance(data, list) else data.get("articles", [])
+        if not items:
+            break
+
+        for item in items:
+            # 构造 URL
+            raw_url = item.get(url_field, "")
+            if raw_url and url_template:
+                url = url_template.format(slug=raw_url)
+            elif raw_url:
+                url = raw_url
+            else:
+                url = ""
+
+            all_items.append({
+                "title": item.get(title_field, ""),
+                "url": url,
+                "date": item.get(time_field, ""),
+                "summary": "",
+                "content": item.get(content_field, ""),
+            })
+        page += 1
+
+    # 过滤当天
+    today_items = _filter_today_items_new_format(all_items, list_config, target_date)
+    return [
+        {
+            "title": it.get("title", ""),
+            "url": it.get("url", ""),
+            "summary": it.get("summary", ""),
+            "time": it.get("date", ""),
+            "publish_time": it.get("date", ""),
+        }
+        for it in today_items
+    ]
+
+
+def _filter_today_items_new_format(all_items: list, list_config: dict, target_date: date) -> list:
+    """过滤当天 items（新格式，直接用 is_today）"""
+    time_field = list_config.get("time_field", "publishedAt")
+    date_format = list_config.get("date_format", "YYYY/MM/DD HH:mm")
+    return [
+        it for it in all_items
+        if is_today(str(it.get("date", "")), today_date=target_date)
+    ]
+
+
+def _fetch_api_items_old_format(source: dict, target_date: date | None, list_config: dict) -> list[dict]:
+    """旧格式 API 采集：endpoint + params + field_mapping"""
+    name = source.get("name", source.get("config_name", "未知数据源"))
+    endpoint = list_config.get("endpoint", "")
     params = dict(list_config.get("params", {}))
     field_mapping = list_config.get("field_mapping", {})
     pagination = list_config.get("pagination", {})
@@ -114,8 +213,7 @@ def fetch_api_items(source: dict, target_date: date | None = None) -> list[dict]
         all_items.extend(items)
         page += 1
 
-    today_items = _filter_today_items(all_items, field_mapping, list_config, target_date)
-    # 字段名归一化：date → publish_time（与入库和 HTML 路径输出一致）
+    today_items = _filter_today_items_old_format(all_items, field_mapping, list_config, target_date)
     return [
         {
             "title": it.get("title", ""),
@@ -126,6 +224,28 @@ def fetch_api_items(source: dict, target_date: date | None = None) -> list[dict]
         }
         for it in today_items
     ]
+
+
+def _filter_today_items_old_format(all_items: list, field_mapping: dict, list_config: dict, target_date: date) -> list:
+    return [
+        it for it in all_items
+        if is_today(str(it.get("date", "")), today_date=target_date)
+    ]
+
+
+def _fetch_api_page(endpoint: str, params: dict) -> dict:
+    """调用 API 获取单页数据（新格式，不自动加 p 参数）"""
+    if endpoint.startswith("//"):
+        endpoint = "https:" + endpoint
+    query = "&".join(f"{k}={v}" for k, v in params.items())
+    url = f"{endpoint}?{query}" if "?" not in endpoint else f"{endpoint}&{query}"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        log(f"API 请求失败: {e}")
+        return {}
 
 
 def _crawl_generic_api(source: dict, batch_id: int, target_date: date | None, list_config: dict) -> dict:

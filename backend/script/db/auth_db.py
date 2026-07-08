@@ -334,7 +334,10 @@ def create_token(user_id: int, token: str) -> None:
 
 def get_user_by_token(token: str) -> tuple | None:
     """通过 token 获取用户信息，返回 (id, phone, email, nickname, subscription_level, subscription_expire_at) 或 None"""
-    conn = get_conn()
+    # 认证库始终使用 primary.db，不受 news_type ContextVar 影响
+    import sqlite3
+    from script.bootstrap import APP_ROOT
+    conn = sqlite3.connect(str(APP_ROOT / "db" / "primary.db"))
     try:
         return conn.execute(
             "SELECT u.id, u.phone, u.email, u.nickname, u.subscription_level, u.subscription_expire_at "
@@ -342,7 +345,7 @@ def get_user_by_token(token: str) -> tuple | None:
             (token,),
         ).fetchone()
     finally:
-        put_conn(conn)
+        conn.close()
 
 
 def delete_token(token: str) -> None:

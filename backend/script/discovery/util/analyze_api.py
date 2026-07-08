@@ -202,7 +202,19 @@ def analyze_api_params(api_url: str) -> dict:
     if not date_param:
         result = _probe_date_param(base_url, params_clean)
         if result is None:
-            raise AnalyzeError("无法识别日期参数")
+            # 无日期参数（如分页 API），返回空结果让调用方决定是否继续
+            today = date.today()
+            today_text = _call_api(base_url, params_clean, None, None)
+            today_count = _count_items(today_text) if today_text else 0
+            return {
+                "date_param": None,
+                "date_format": None,
+                "verified": False,
+                "warning": "无日期参数（分页或无过滤 API）",
+                "today_items": today_count,
+                "yesterday_items": 0,
+                "params": params_clean,
+            }
         date_param, date_format = result
 
     # 3. 验证：today + yesterday 各调一次

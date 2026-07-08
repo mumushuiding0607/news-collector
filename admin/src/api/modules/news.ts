@@ -12,6 +12,16 @@ export const getLatestNews = (params: Record<string, unknown>) =>
 export const getHotNews = (params: Record<string, unknown>) =>
   api.get("/api/news/hot", { params });
 
+// AI 新闻
+export const getAiLatestNews = () =>
+  api.get("/api/news/ai/latest");
+
+export const getAiHistoryNews = () =>
+  api.get("/api/news/ai/history");
+
+export const getAiAllNews = () =>
+  api.get("/api/news/ai/all");
+
 export const getNewsDetail = (newsId: number) =>
   api.get(`/api/news/detail/${newsId}`);
 
@@ -25,16 +35,16 @@ export const runPipelineFull = () =>
   api.post("/api/news/pipeline/run");
 
 // 数据源学习/抓取（与 news 流水线相关）
-export const learnSource = (params: { url: string; name?: string; headline?: string; skip_article?: boolean; force_relearn?: boolean }) =>
+export const learnSource = (params: { url: string; name?: string; headline?: string; skip_article?: boolean; force_relearn?: boolean; news_type?: string }) =>
   api.get("/api/news/learn", { params });
 
-export const learnSourceAsync = (params: { url: string; name?: string; headline?: string; skip_article?: boolean }) =>
+export const learnSourceAsync = (params: { url: string; name?: string; headline?: string; skip_article?: boolean; news_type?: string }) =>
   api.get("/api/news/learn_async", { params });
 
-export const fetchSourceNews = (params: { url: string; limit?: number }) =>
+export const fetchSourceNews = (params: { url: string; limit?: number; news_type?: string }) =>
   api.get("/api/news/fetch", { params });
 
-export const fetchSourceNewsAsync = (params: { url: string; limit?: number }) =>
+export const fetchSourceNewsAsync = (params: { url: string; limit?: number; news_type?: string }) =>
   api.get("/api/news/fetch_async", { params });
 
 export const fetchArticleContent = (url: string, sourceName?: string) =>

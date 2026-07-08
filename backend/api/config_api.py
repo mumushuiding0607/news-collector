@@ -17,6 +17,8 @@ from core.config_service import (
     get_app_version_config, update_app_version_config,
     get_sources_config, update_sources_config,
 )
+import json
+from pathlib import Path
 from backend.api._auth import require_admin
 
 router = APIRouter(prefix="/config", tags=["配置"])
@@ -162,3 +164,28 @@ def update_config_sources(request: Request, updates: dict):
         return update_sources_config(updates)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ==================== 侧边栏菜单配置 ====================
+_SIDEBAR_MENU_PATH = Path(__file__).resolve().parent.parent / "config" / "sidebar_menu.json"
+_cached_sidebar_menu: dict | None = None
+
+
+def get_sidebar_menu_config() -> dict:
+    """读取侧边栏菜单配置（首次调用时缓存）"""
+    global _cached_sidebar_menu
+    if _cached_sidebar_menu is None:
+        if _SIDEBAR_MENU_PATH.exists():
+            _cached_sidebar_menu = json.loads(_SIDEBAR_MENU_PATH.read_text(encoding="utf-8"))
+        else:
+            _cached_sidebar_menu = {"default": "stock", "newsTypes": {}}
+    return _cached_sidebar_menu
+
+
+@router.get("/sidebar_menu")
+def get_sidebar_menu(request: Request):
+    """
+    获取侧边栏菜单配置（无需管理员权限）
+    返回各新闻类型对应的菜单项
+    """
+    return get_sidebar_menu_config()

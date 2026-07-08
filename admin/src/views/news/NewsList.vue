@@ -4,6 +4,7 @@ import { getCrawlConfigSourceNames } from "../../api";
 import { MoreFilled, ArrowRight } from "@element-plus/icons-vue";
 import { useMobile } from "../../composables/useMobile";
 import { useNewsList } from "./useNewsList";
+import { useNewsTypeStore } from "../../stores/newsType";
 import type { NewsTab } from "./types";
 import DeleteDateDialog from "./dialogs/DeleteDateDialog.vue";
 
@@ -14,6 +15,7 @@ const emit = defineEmits<{
 }>();
 
 const { isMobile } = useMobile();
+const newsTypeStore = useNewsTypeStore();
 const { loading, tableData, pagination, filterForm, fetchList, markUseful, handleSearch, handleReset } = useNewsList();
 
 const sourceNameOptions = ref<string[]>([]);
@@ -21,7 +23,8 @@ const deleteDateVisible = ref(false);
 
 async function fetchSourceNames() {
   try {
-    const res = (await getCrawlConfigSourceNames()) as { source_names?: string[] };
+    const newsType = newsTypeStore.newsType === "ai" ? "ai" : "stock";
+    const res = (await getCrawlConfigSourceNames(newsType)) as { source_names?: string[] };
     sourceNameOptions.value = res.source_names || [];
   } catch (e) {
     console.error(e);
@@ -48,6 +51,9 @@ function doReset() {
 }
 
 watch(() => props.tab, refresh, { immediate: false });
+
+// 新闻类型切换时刷新列表
+watch(() => newsTypeStore.newsType, refresh);
 
 onMounted(async () => {
   await fetchSourceNames();
