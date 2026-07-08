@@ -74,23 +74,6 @@ flutter {
     source = "../.."
 }
 
-// ============ 打包前自动同步版本 ============
-val syncVersion by tasks.registering {
-    doLast {
-        val python = System.getenv("PYTHON") ?: "python"
-        val script = rootProject.layout.projectDirectory.file("../scripts/sync_version.py").asFile
-        println("[sync_version] running: $script")
-        val result = ProcessBuilder(listOf(python, script.absolutePath))
-            .redirectError(ProcessBuilder.Redirect.INHERIT)
-            .redirectOutput(ProcessBuilder.Redirect.INHERIT)
-            .start()
-        val exitCode = result.waitFor()
-        if (exitCode != 0) {
-            throw GradleException("sync_version.py failed with exit code $exitCode")
-        }
-    }
-}
-
 // ============ 打包前自动同步图标 ============
 val syncIcon by tasks.registering {
     doLast {
@@ -109,5 +92,5 @@ val syncIcon by tasks.registering {
 }
 
 tasks.preBuild {
-    dependsOn(syncVersion, syncIcon)
+    dependsOn(syncIcon)
 }

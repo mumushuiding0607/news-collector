@@ -42,14 +42,6 @@ REM Read version from metadata.json
 for /f "delims=" %%v in ('python "%SCRIPT_DIR%util\get_version.py" version_name') do set "VERSION_NAME=%%v"
 for /f "delims=" %%c in ('python "%SCRIPT_DIR%util\get_version.py" version_code') do set "VERSION_CODE=%%c"
 
-REM Update pubspec.yaml with correct version format (version_name+version_code)
-echo [PATCH] Updating pubspec.yaml version to !VERSION_NAME!+!VERSION_CODE!...
-python "%SCRIPT_DIR%util\update_pubspec_version.py" "%PROJECT_ROOT%" "!VERSION_NAME!" "!VERSION_CODE!"
-if errorlevel 1 (
-    echo [ERROR] Failed to update pubspec.yaml
-    exit /b 1
-)
-
 echo ================================================================
 echo   News Board - Flutter Build Script
 echo ================================================================
@@ -79,6 +71,27 @@ REM ================================================================
 set "PATH=!JAVA_HOME!\bin;!FLUTTER_SDK!\bin;%PATH%"
 
 cd /d "!PROJECT_ROOT!"
+
+REM ================================================================
+REM Copy app_icon.png to Android mipmap directories
+REM ================================================================
+echo.
+echo [INFO] Copying app_icon.png to Android mipmap directories...
+set "ICON_SRC=%SCRIPT_DIR%app_icon.png"
+set "ICON_DST_BASE=%PROJECT_ROOT%\android\app\src\main\res"
+
+if not exist "!ICON_SRC!" (
+    echo [WARN] app_icon.png not found, skipping icon update
+) else (
+    REM Copy to all mipmap densities (overwrite existing icons)
+    copy /Y "!ICON_SRC!" "!ICON_DST_BASE!\mipmap-mdpi\ic_launcher.png" >nul 2>&1
+    copy /Y "!ICON_SRC!" "!ICON_DST_BASE!\mipmap-hdpi\ic_launcher.png" >nul 2>&1
+    copy /Y "!ICON_SRC!" "!ICON_DST_BASE!\mipmap-xhdpi\ic_launcher.png" >nul 2>&1
+    copy /Y "!ICON_SRC!" "!ICON_DST_BASE!\mipmap-xxhdpi\ic_launcher.png" >nul 2>&1
+    copy /Y "!ICON_SRC!" "!ICON_DST_BASE!\mipmap-xxxhdpi\ic_launcher.png" >nul 2>&1
+    REM Only copy to mipmap directories (drawable has XML files that should not be overwritten)
+    echo   [OK] Icons updated from app_icon.png
+)
 
 REM ================================================================
 REM Build

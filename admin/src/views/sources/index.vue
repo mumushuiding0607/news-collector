@@ -126,7 +126,7 @@ const listRef = ref<{ refresh: () => void } | null>(null);
 
     <AddSourceDialog
       v-model:visible="addVisible"
-      @added="() => listRef.value?.refresh()"
+      @added="() => listRef?.refresh()"
     />
 
     <LogViewer

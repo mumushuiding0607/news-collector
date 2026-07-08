@@ -16,13 +16,39 @@ setlocal enabledelayedexpansion
 
 set "SCRIPT_DIR=%~dp0"
 
-call "%SCRIPT_DIR%util\load_env.bat"
-if errorlevel 1 (
-    echo [ERROR] Failed to load config
+REM ================================================================
+REM Load .env configuration
+REM ================================================================
+set "ENV_FILE=%SCRIPT_DIR%.env"
+
+if exist "%ENV_FILE%" (
+    for /f "usebackq tokens=1,* delims==" %%a in ("%ENV_FILE%") do (
+        set "key=%%a"
+        set "val=%%b"
+        set "key=!key: =!"
+        set "key=!key:#=!"
+        if not "!key!"=="" (
+            if "!key!"=="SERVER_IP" set "SERVER_IP=!val!"
+            if "!key!"=="SERVER_USER" set "SERVER_USER=!val!"
+            if "!key!"=="SERVER_PORT" set "SERVER_PORT=!val!"
+            if "!key!"=="REMOTE_PATH" set "REMOTE_PATH=!val!"
+            if "!key!"=="SSH_KEY" set "SSH_KEY=!val!"
+        )
+    )
+)
+
+if not defined SERVER_IP (
+    echo [ERROR] SERVER_IP not configured in .env
+    exit /b 1
+)
+if not defined SSH_KEY (
+    echo [ERROR] SSH_KEY not configured in .env
     exit /b 1
 )
 
+REM ================================================================
 REM Read version from metadata.json
+REM ================================================================
 for /f "delims=" %%v in ('python "%SCRIPT_DIR%util\get_version.py" version_name') do set "VERSION_NAME=%%v"
 for /f "delims=" %%c in ('python "%SCRIPT_DIR%util\get_version.py" version_code') do set "VERSION_CODE=%%c"
 for /f "delims=" %%d in ('python "%SCRIPT_DIR%util\get_version.py" update_description') do set "UPDATE_DESC=%%d"
@@ -33,14 +59,14 @@ echo [INFO] Update desc: !UPDATE_DESC!
 REM ================================================================
 REM Remote paths
 REM ================================================================
-set "REMOTE_CONFIG=/opt/app/backend/config.json"
-set "LOCAL_CONFIG=/tmp/config_update_!RANDOM!.json"
+set "REMOTE_CONFIG=!REMOTE_PATH!/backend/config.json"
+set "LOCAL_CONFIG=!TEMP!\config_update_!RANDOM!.json"
 
 REM ================================================================
 REM Download remote config
 REM ================================================================
 echo [INFO] Downloading remote config...
-bash -c "scp -P !SERVER_PORT! -i '!SSH_KEY!' '!SERVER_USER!@!SERVER_IP!:!REMOTE_CONFIG!' '!LOCAL_CONFIG!'"
+scp -P !SERVER_PORT! -i "!SSH_KEY!" "!SERVER_USER!@!SERVER_IP!:!REMOTE_CONFIG!" "!LOCAL_CONFIG!"
 if errorlevel 1 (
     echo [ERROR] Failed to fetch remote config
     exit /b 1
@@ -49,9 +75,6 @@ echo [OK] Downloaded
 
 REM ================================================================
 REM In-place update via standalone helper script
-REM Using a separate .py script because cmd heredoc (.. echo ...) breaks
-REM on parentheses in strings, causing parse errors in the python script
-REM that then fail at runtime. The .py helper avoids cmd string parsing.
 REM ================================================================
 python "%SCRIPT_DIR%util\update_config_helper.py" "!LOCAL_CONFIG!" "!VERSION_NAME!" "!VERSION_CODE!" "!UPDATE_DESC!"
 if errorlevel 1 (
@@ -64,7 +87,7 @@ REM ================================================================
 REM Upload updated config
 REM ================================================================
 echo [INFO] Uploading updated config to server...
-bash -c "scp -P !SERVER_PORT! -i '!SSH_KEY!' '!LOCAL_CONFIG!' '!SERVER_USER!@!SERVER_IP!:!REMOTE_CONFIG!'"
+scp -P !SERVER_PORT! -i "!SSH_KEY!" "!LOCAL_CONFIG!" "!SERVER_USER!@!SERVER_IP!:!REMOTE_CONFIG!"
 if errorlevel 1 (
     echo [ERROR] Config upload failed
     del "!LOCAL_CONFIG!" 2>nul

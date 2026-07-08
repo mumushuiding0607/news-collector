@@ -105,17 +105,17 @@ if not exist "!ADMIN_DIR!\dist" (
 REM Create remote directory (clean)
 echo [INFO] Cleaning remote directory...
 if defined SSH_KEY_ABS (
-    "E:\Git\usr\bin\ssh.exe" -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "rm -rf !REMOTE_PATH!/admin/*"
+    ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "rm -rf !REMOTE_PATH!/admin/*"
 ) else (
-    "E:\Git\usr\bin\ssh.exe" -p !SERVER_PORT! !SERVER_USER!@!SERVER_IP! "rm -rf !REMOTE_PATH!/admin/*"
+    ssh -p !SERVER_PORT! !SERVER_USER!@!SERVER_IP! "rm -rf !REMOTE_PATH!/admin/*"
 )
 
 REM Upload build files
 echo [INFO] Uploading build files...
 if defined SSH_KEY_ABS (
-    "E:\Git\usr\bin\scp.exe" -P !SERVER_PORT! -i '!SSH_KEY_ABS!' -r '!ADMIN_DIR!\dist'/* !SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/admin/
+    scp -P !SERVER_PORT! -i '!SSH_KEY_ABS!' -r '!ADMIN_DIR!\dist'/* !SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/admin/
 ) else (
-    "E:\Git\usr\bin\scp.exe" -P !SERVER_PORT! -r '!ADMIN_DIR!\dist'/* !SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/admin/
+    scp -P !SERVER_PORT! -r '!ADMIN_DIR!\dist'/* !SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/admin/
 )
 if errorlevel 1 (
     echo [ERROR] Upload failed
@@ -128,10 +128,10 @@ echo.
 echo [INFO] Checking remote Node.js environment...
 
 REM Check if npm is available on remote server
-"E:\Git\usr\bin\ssh.exe" -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "command -v npm"
+ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "command -v npm"
 if errorlevel 1 (
     echo [WARN] npm not found on remote server, attempting to install Node.js...
-    "E:\Git\usr\bin\ssh.exe" -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs"
+    ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs"
     if errorlevel 1 (
         echo [ERROR] Node.js installation failed. Please install Node.js on the server manually.
         exit /b 1
@@ -142,7 +142,7 @@ if errorlevel 1 (
 )
 
 REM Check and install PM2 if needed
-"E:\Git\usr\bin\ssh.exe" -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "command -v pm2 || npm install -g pm2"
+ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "command -v pm2 || npm install -g pm2"
 if errorlevel 1 (
     echo [ERROR] PM2 installation failed
     exit /b 1
@@ -150,10 +150,10 @@ if errorlevel 1 (
 echo [OK] PM2 ready
 
 REM Stop and delete existing service (ignore errors)
-"E:\Git\usr\bin\ssh.exe" -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "pm2 stop admin-web 2>/dev/null; pm2 delete admin-web 2>/dev/null; true"
+ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "pm2 stop admin-web 2>/dev/null; pm2 delete admin-web 2>/dev/null; true"
 
 REM Start new service (SPA mode for Vue router)
-"E:\Git\usr\bin\ssh.exe" -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "pm2 serve !REMOTE_PATH!/admin --name admin-web --port 5173 --spa"
+ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "pm2 serve !REMOTE_PATH!/admin --name admin-web --port 5173 --spa"
 echo [OK] Service restarted
 
 REM ================================================================

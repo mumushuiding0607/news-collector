@@ -136,8 +136,8 @@
   ],
   "scheduler": {},
   "app_version": {
-    "latest_version": "1.0.42",
-    "latest_build": 42,
+    "latest_version": "1.0.49",
+    "latest_build": 49,
     "min_required_version": "1.0.0",
     "min_required_build": 1,
     "update_description": "修复若干问题，提升稳定性",

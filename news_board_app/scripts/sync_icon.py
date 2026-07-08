@@ -7,6 +7,7 @@ import sys
 import shutil
 from pathlib import Path
 
+
 def sync_icon():
     script_dir = Path(__file__).resolve().parent
     # scripts -> news_board_app
@@ -33,6 +34,7 @@ def sync_icon():
     print(f"[sync_icon] Synced: {src_icon} -> {dst_foreground}")
 
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(sync_icon())

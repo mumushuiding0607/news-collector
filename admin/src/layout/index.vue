@@ -64,7 +64,7 @@ watch(isMobile, (mobile) => {
 
 onMounted(async () => {
   try {
-    const data = await getSidebarMenu() as typeof sidebarConfig.value;
+    const data = await getSidebarMenu() as unknown as typeof sidebarConfig.value;
     sidebarConfig.value = data;
     if (data.default && data.default !== newsTypeStore.newsType) {
       newsTypeStore.setNewsType(data.default as "stock" | "ai");

@@ -44,9 +44,9 @@ async function fetchConfig() {
   loading.value = true;
   try {
     const [appData, envData, sourcesData] = await Promise.all([
-      getAppConfig() as unknown as Promise<Record<string, unknown>>,
-      getEnvConfig() as unknown as Promise<Record<string, unknown>>,
-      getSourcesConfig() as unknown as Promise<Record<string, unknown>>,
+      getAppConfig() as unknown as Record<string, unknown>,
+      getEnvConfig() as unknown as Record<string, unknown>,
+      getSourcesConfig() as unknown as Record<string, unknown>,
     ]);
     appConfig.value = appData;
     envConfig.value = envData;
@@ -73,18 +73,18 @@ async function fetchConfig() {
     }
     if (sourcesData) {
       sourcesForm.value = {
-        crawNumPerSource: sourcesData["crawNumPerSource"] ?? 30,
-        maxConsecutiveNonToday: sourcesData["maxConsecutiveNonToday"] ?? 10,
-        llmBatchSize: sourcesData["llmBatchSize"] ?? 20,
-        llmTimeout: sourcesData["llmTimeout"] ?? 120,
-        llmMaxRetries: sourcesData["llmMaxRetries"] ?? 3,
-        newsFilterTimeout: sourcesData["newsFilterTimeout"] ?? 40,
-        scorerTimeout: sourcesData["scorerTimeout"] ?? 90,
-        findStocksTimeout: sourcesData["findStocksTimeout"] ?? 80,
+        crawNumPerSource: (sourcesData["crawNumPerSource"] as number) ?? 30,
+        maxConsecutiveNonToday: (sourcesData["maxConsecutiveNonToday"] as number) ?? 10,
+        llmBatchSize: (sourcesData["llmBatchSize"] as number) ?? 20,
+        llmTimeout: (sourcesData["llmTimeout"] as number) ?? 120,
+        llmMaxRetries: (sourcesData["llmMaxRetries"] as number) ?? 3,
+        newsFilterTimeout: (sourcesData["newsFilterTimeout"] as number) ?? 40,
+        scorerTimeout: (sourcesData["scorerTimeout"] as number) ?? 90,
+        findStocksTimeout: (sourcesData["findStocksTimeout"] as number) ?? 80,
         newsCache: {
-          minScore: sourcesData["newsCache"]?.["minScore"] ?? 5,
-          hotNewsMinScore: sourcesData["newsCache"]?.["hotNewsMinScore"] ?? 8,
-          historyDays: sourcesData["newsCache"]?.["historyDays"] ?? 3,
+          minScore: (sourcesData["newsCache"] as Record<string, unknown>)?.["minScore"] as number ?? 5,
+          hotNewsMinScore: (sourcesData["newsCache"] as Record<string, unknown>)?.["hotNewsMinScore"] as number ?? 8,
+          historyDays: (sourcesData["newsCache"] as Record<string, unknown>)?.["historyDays"] as number ?? 3,
         },
       };
     }
