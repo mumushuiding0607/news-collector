@@ -76,7 +76,7 @@ scp -P !SERVER_PORT! -o LogLevel=ERROR -o StrictHostKeyChecking=no -i !SSH_KEY_A
 echo [OK]
 
 echo [STEP 3] Start scheduler...
-ssh -p !SERVER_PORT! -o LogLevel=ERROR -o StrictHostKeyChecking=no -i !SSH_KEY_ABS! !SERVER_USER!@!SERVER_IP! "mkdir -p '!REMOTE_PATH!/logs/!TODAY!' && cd '!REMOTE_PATH!' && nohup python3 backend/run_scheduler.py >'!REMOTE_PATH!/logs/!TODAY!/scheduler.log' 2>&1 &"
+start /b cmd /c "ssh -p !SERVER_PORT! -o LogLevel=ERROR -o StrictHostKeyChecking=no -i !SSH_KEY_ABS! !SERVER_USER!@!SERVER_IP! \"mkdir -p '!REMOTE_PATH!/logs/!TODAY!' ^&^& cd '!REMOTE_PATH!' ^&^& nohup python3 backend/run_scheduler.py >'!REMOTE_PATH!/logs/!TODAY!/scheduler.log' 2^>^&1 ^&^& exit""
 echo [OK]
 
 echo [STEP 4] Verify...
