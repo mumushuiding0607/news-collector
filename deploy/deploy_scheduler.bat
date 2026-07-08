@@ -1,35 +1,21 @@
 @echo off
 chcp 65001 >nul 2>&1
-REM ================================================================
-REM News Collector - Scheduler Deployment Script
-REM ================================================================
-REM
-REM Deploy scheduler to remote server
-REM
-REM Usage:
-REM   Run in cmd: deploy_scheduler.bat
-REM ================================================================
-
 setlocal enabledelayedexpansion
 
 set "SCRIPT_DIR=%~dp0"
 set "PROJECT_ROOT=%SCRIPT_DIR%.."
-set "DEPLOY_DIR=%SCRIPT_DIR%"
-set "ENV_FILE=%DEPLOY_DIR%.env"
+set "ENV_FILE=%SCRIPT_DIR%.env"
 
 set "SERVER_IP="
-set "SERVER_USER=admin"
+set "SERVER_USER=root"
 set "SERVER_PORT=22"
-set "REMOTE_PATH=/opt/backend"
-set "SSH_KEY="
+set "REMOTE_PATH=/opt/app"
 
-echo.
-echo ================================================================
+echo =================================================================
 echo   Scheduler Deployment Script
-echo ================================================================
+echo =================================================================
 
 if exist "%ENV_FILE%" (
-    echo [INFO] Loading config: %ENV_FILE%
     for /f "usebackq tokens=1,* delims==" %%a in ("%ENV_FILE%") do (
         set "key=%%a"
         set "val=%%b"
@@ -44,12 +30,9 @@ if exist "%ENV_FILE%" (
         )
     )
     if defined SERVER_IP (
-        echo [OK] Config loaded
-        echo   SERVER_IP: !SERVER_IP!
-        echo   SERVER_USER: !SERVER_USER!
-        echo   REMOTE_PATH: !REMOTE_PATH!
+        echo [OK] Config loaded: !SERVER_USER!@!SERVER_IP!:!SERVER_PORT! - !REMOTE_PATH!
     ) else (
-        echo [ERROR] Config file is incomplete or SERVER_IP not set
+        echo [ERROR] Config file incomplete
         exit /b 1
     )
 ) else (
@@ -57,79 +40,54 @@ if exist "%ENV_FILE%" (
     exit /b 1
 )
 
-REM ================================================================
-REM Build SSH/SCP command
-REM ================================================================
-set "SSH_CMD=ssh"
-set "SCP_CMD=scp"
+for /f "tokens=*" %%i in ('powershell -Command "Get-Date -Format 'yyyy-MM-dd'"') do set "TODAY=%%i"
 
+set "SSH_KEY_ABS="
+set "SSH_KEY_UNIX="
 if defined SSH_KEY (
-    set "SSH_CMD=ssh -i !SSH_KEY!"
-    set "SCP_CMD=scp -i !SSH_KEY!"
+    set "SSH_KEY_FULL=!PROJECT_ROOT!\!SSH_KEY!"
+    for /f "delims=" %%i in ('powershell -Command "[System.IO.Path]::GetFullPath('!SSH_KEY_FULL!')"') do set "SSH_KEY_ABS=%%i"
+    for /f "delims=" %%i in ('bash -c "cygpath -u '!SSH_KEY_ABS!'"') do set "SSH_KEY_UNIX=%%i"
+    if defined SSH_KEY_ABS icacls "!SSH_KEY_ABS!" /inheritance:r /grant:r "!USERNAME!:R" >nul 2>&1
 )
 
-set "SSH_FULL=!SSH_CMD! -p !SERVER_PORT! -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 !SERVER_USER!@!SERVER_IP!"
-set "SCP_FULL=!SCP_CMD! -P !SERVER_PORT! -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
+if not exist "%PROJECT_ROOT%\backend\config\tasks.json" echo [ERROR] tasks.json not found && exit /b 1
+if not exist "%PROJECT_ROOT%\backend\run_scheduler.py" echo [ERROR] run_scheduler.py not found && exit /b 1
+echo [OK] Files found
 
-echo.
-echo [CHECK] Checking required files...
-if not exist "%PROJECT_ROOT%\backend\config\tasks.json" (
-    echo [ERROR] tasks.json not found in backend\config
-    exit /b 1
-)
-if not exist "%PROJECT_ROOT%\backend\run_scheduler.py" (
-    echo [ERROR] run_scheduler.py not found
-    exit /b 1
-)
-echo [OK] All files found
-
-echo.
-echo ================================================================
-echo   Scheduler Deployment
-echo ================================================================
+echo =================================================================
 echo   Server: !SERVER_USER!@!SERVER_IP!:!SERVER_PORT!
 echo   Path:   !REMOTE_PATH!
-echo ================================================================
-echo [INFO] Proceeding with deployment...
+if defined SSH_KEY_UNIX echo   Key:   !SSH_KEY_UNIX!
+if not defined SSH_KEY_UNIX if defined SSH_KEY_ABS echo   Key:   !SSH_KEY_ABS!
+echo =================================================================
 echo.
 
-echo [STEP 1] Stop existing scheduler...
-!SSH_FULL! "pkill -f 'backend/run_scheduler.py' || true"
-sleep 2
-!SSH_FULL! "pkill -9 -f 'backend/run_scheduler.py' || true"
-sleep 2
-echo [OK] Old scheduler stopped
+echo [STEP 1] Stop scheduler...
+ssh -p !SERVER_PORT! -o LogLevel=ERROR -o StrictHostKeyChecking=no -i !SSH_KEY_ABS! !SERVER_USER!@!SERVER_IP! "pkill -f 'backend/run_scheduler.py' || true"
+timeout /t 2 >nul 2>&1
+ssh -p !SERVER_PORT! -o LogLevel=ERROR -o StrictHostKeyChecking=no -i !SSH_KEY_ABS! !SERVER_USER!@!SERVER_IP! "pkill -9 -f 'backend/run_scheduler.py' || true"
+timeout /t 2 >nul 2>&1
+echo [OK]
+
+echo [STEP 2] Upload files...
+scp -P !SERVER_PORT! -o LogLevel=ERROR -o StrictHostKeyChecking=no -i !SSH_KEY_ABS! "%PROJECT_ROOT%\backend\run_scheduler.py" !SERVER_USER!@!SERVER_IP!:%REMOTE_PATH%/backend/run_scheduler.py
+scp -P !SERVER_PORT! -o LogLevel=ERROR -o StrictHostKeyChecking=no -i !SSH_KEY_ABS! -r "%PROJECT_ROOT%\backend\config" !SERVER_USER!@!SERVER_IP!:%REMOTE_PATH%/backend/
+echo [OK]
+
+echo [STEP 3] Start scheduler...
+ssh -p !SERVER_PORT! -o LogLevel=ERROR -o StrictHostKeyChecking=no -i !SSH_KEY_ABS! !SERVER_USER!@!SERVER_IP! "mkdir -p '!REMOTE_PATH!/logs/!TODAY!' && cd '!REMOTE_PATH!' && nohup python3 backend/run_scheduler.py >'!REMOTE_PATH!/logs/!TODAY!/scheduler.log' 2>&1 &"
+echo [OK]
+
+echo [STEP 4] Verify...
+timeout /t 2 >nul 2>&1
+ssh -p !SERVER_PORT! -o LogLevel=ERROR -o StrictHostKeyChecking=no -i !SSH_KEY_ABS! !SERVER_USER!@!SERVER_IP! "pgrep -f 'backend/run_scheduler.py' > /dev/null 2>&1 && echo '[OK] Running' || echo '[WARN] Not running'"
+
+echo [STEP 5] Logs...
+ssh -p !SERVER_PORT! -o LogLevel=ERROR -o StrictHostKeyChecking=no -i !SSH_KEY_ABS! !SERVER_USER!@!SERVER_IP! "head -10 '!REMOTE_PATH!/logs/!TODAY!/scheduler.log' 2>/dev/null || echo '(no log yet)'"
 
 echo.
-echo [STEP 2] Upload scheduler files...
-echo [INFO] Uploading run_scheduler.py...
-!SCP_FULL! "%PROJECT_ROOT%\backend\run_scheduler.py" !SERVER_USER!@!SERVER_IP!:%REMOTE_PATH%/backend/run_scheduler.py
-echo [INFO] Uploading config directory...
-!SCP_FULL! -r "%PROJECT_ROOT%\backend\config" !SERVER_USER!@!SERVER_IP!:%REMOTE_PATH%/backend/config
-echo [OK] Upload complete
-
-echo.
-echo [STEP 3] Start scheduler in background...
-!SSH_FULL! "mkdir -p '%REMOTE_PATH%/logs' && cd '%REMOTE_PATH%' && nohup python3 backend/run_scheduler.py >> '%REMOTE_PATH%/logs/scheduler.log' 2>&1 &"
-echo [OK] Scheduler started
-
-echo.
-echo [STEP 4] Verify scheduler...
-sleep 2
-!SSH_FULL! "pgrep -f 'admin/scheduler/job_runner.py' > /dev/null 2>&1 && echo '[OK] Running' || echo '[WARN] Not running'"
-
-echo.
-echo [STEP 5] Show recent logs...
-echo --- scheduler log (first 10 lines) ---
-for /f "tokens=*" %%a in ('!SSH_FULL! "head -10 '%REMOTE_PATH%/logs/scheduler.log' 2>/dev/null || echo '(no log yet)'" 2^>nul') do echo %%a
-echo --- application log ---
-echo Log directory: %REMOTE_PATH%/logs/
-for /f "tokens=*" %%a in ('!SSH_FULL! "ls -la '%REMOTE_PATH%/logs/' 2>/dev/null || echo '(logs dir not found)'" 2^>nul') do echo %%a
-echo.
-
-echo ================================================================
-echo   Deployment Complete
-echo ================================================================
-for /f "tokens=*" %%a in ('!SSH_FULL! "echo Logs: tail -f '%REMOTE_PATH%/logs/scheduler.log'" 2^>nul') do echo   %%a
-for /f "tokens=*" %%a in ('!SSH_FULL! "echo Stop: pkill -f 'backend/run_scheduler.py'" 2^>nul') do echo   %%a
-echo ================================================================
+echo =================================================================
+echo   Done
+echo   Logs: tail -f !REMOTE_PATH!/logs/!TODAY!/scheduler.log
+echo =================================================================

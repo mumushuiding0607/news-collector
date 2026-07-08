@@ -7,7 +7,7 @@
       "description": "采集和评分",
       "cron": "0 0 8-15 * * MON-FRI",
       "enabled": true,
-      "trigOnDeploy": true,
+      "trigOnDeploy": false,
       "handler": "backend.service.news_pipeline.run_pipeline"
     },
     {

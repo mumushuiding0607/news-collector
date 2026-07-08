@@ -147,6 +147,23 @@ def download_apk(filename: str):
     )
 
 
+@app.get("/img/{filename}")
+def download_img(filename: str):
+    """提供图片文件下载"""
+    img_dir = _BACKEND_DIR.parent / "img"
+    img_file = img_dir / filename
+    if not img_file.exists():
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    # 根据文件扩展名确定 Content-Type
+    import mimetypes
+    content_type, _ = mimetypes.guess_type(str(img_file))
+    if content_type is None:
+        content_type = "application/octet-stream"
+
+    return FileResponse(img_file, media_type=content_type)
+
+
 if __name__ == "__main__":
     import psutil
     import uvicorn

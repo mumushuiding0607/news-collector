@@ -62,7 +62,7 @@ class _DownloadPageState extends ConsumerState<DownloadPage> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(22),
                       child: Image.network(
-                        '${ApiConfig.baseUrl}/apk/app_icon',
+                        '${ApiConfig.baseUrl}/img/app_icon.png',
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
                           return const Icon(
