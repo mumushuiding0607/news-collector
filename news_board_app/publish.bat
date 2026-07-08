@@ -1,6 +1,6 @@
 @echo off
 REM ================================================================
-REM 全自动构建并发布到小米/华为应用市场
+REM 指南针AI - 全自动构建并发布到小米/华为应用市场
 REM ================================================================
 REM
 REM 前置条件:
@@ -57,8 +57,8 @@ for /f "usebackq tokens=*" %%t in (`findstr /C:"version_name" "%META_FILE%"`) do
     set "line=%%t"
     for /f "tokens=1,* delims=:" %%a in ("!line!") do (
         set "val=%%b"
-        set "val=!val:,=!"
-        set "val=!val: =!"
+        set "val=!val:,=!
+        set "val=!val: =!
         set "val=!val:"=!
         set "VERSION_NAME=!val!"
     )
@@ -67,7 +67,7 @@ for /f "usebackq tokens=*" %%t in (`findstr /C:"version_code" "%META_FILE%"`) do
     set "line=%%t"
     for /f "tokens=1,* delims=:" %%a in ("!line!") do (
         set "val=%%b"
-        set "val=!val:,=!"
+        set "val=!val:,=!
         set "val=!val: =!
         set "val=!val:"=!
         set "VERSION_CODE=!val!"
@@ -83,7 +83,7 @@ if not defined VERSION_NAME (
 echo   版本: !VERSION_NAME! (build !VERSION_CODE!)
 
 echo ================================================================
-echo   自动发布脚本
+echo   指南针AI - 自动发布脚本
 echo ================================================================
 echo   版本: !VERSION_NAME! (versionCode !VERSION_CODE!)
 echo ================================================================
@@ -248,13 +248,12 @@ curl -X POST "!HW_TOKEN_URL!" ^
 set "HW_ACCESS_TOKEN="
 for /f "usebackq tokens=*" %%t in (`findstr /C:"access_token" "%TEMP%\_hw_token.json"`) do (
     set "line=%%t"
-    set "line=!line:*access_token:=!"
-    set "line=!line:,=!"
-    set "line=!line: =!"
-    set "line=!line:"=!"
-    set "HW_ACCESS_TOKEN=!line!"
+    set "line=!line:*access_token:=!
+    set "line=!line:,=!
+    set "line=!line: =!
+    set "line=!line:"=!
+    set "HW_ACCESS_TOKEN=!line!
 )
-echo   Token: !HW_ACCESS_TOKEN!
 
 REM 上传 APK
 if defined HW_ACCESS_TOKEN (

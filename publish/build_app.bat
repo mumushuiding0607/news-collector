@@ -42,6 +42,14 @@ REM Read version from metadata.json
 for /f "delims=" %%v in ('python "%SCRIPT_DIR%util\get_version.py" version_name') do set "VERSION_NAME=%%v"
 for /f "delims=" %%c in ('python "%SCRIPT_DIR%util\get_version.py" version_code') do set "VERSION_CODE=%%c"
 
+REM Update pubspec.yaml with correct version format (version_name+version_code)
+echo [PATCH] Updating pubspec.yaml version to !VERSION_NAME!+!VERSION_CODE!...
+python "%SCRIPT_DIR%util\update_pubspec_version.py" "%PROJECT_ROOT%" "!VERSION_NAME!" "!VERSION_CODE!"
+if errorlevel 1 (
+    echo [ERROR] Failed to update pubspec.yaml
+    exit /b 1
+)
+
 echo ================================================================
 echo   News Board - Flutter Build Script
 echo ================================================================

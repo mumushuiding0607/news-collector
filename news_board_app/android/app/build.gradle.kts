@@ -3,17 +3,18 @@ import java.util.Properties
 
 // ============ 读取 metadata.json（必须在 plugins 块之前，以便 Flutter 插件能读到正确的版本号）===========
 val metadataFile = rootProject.layout.projectDirectory.file("../../publish/metadata.json").asFile
-val metadata = run {
+@Suppress("UNCHECKED_CAST")
+val metadata: Map<String, Any> = run {
     val slurper = JsonSlurper()
     slurper.parse(metadataFile) as Map<String, Any>
 }
 
-val appName = metadata["app_name"] as String
-val appNameEn = metadata["app_name_en"] as String
-val versionName = metadata["version_name"] as String
-val versionCode = (metadata["version_code"] as Number).toInt()
-val privacyPolicyUrl = metadata["privacy_policy_url"] as String
-val applicationId = metadata["application_id"] as String
+val appName: String = metadata["app_name"] as String
+val appNameEn: String = metadata["app_name_en"] as String
+val versionName: String = metadata["version_name"] as? String ?: ""
+val versionCode: Int = (metadata["version_code"] as Number).toInt()
+val privacyPolicyUrl: String = metadata["privacy_policy_url"] as String
+val applicationId: String = metadata["application_id"] as String
 
 plugins {
     id("com.android.application")
@@ -45,8 +46,6 @@ android {
         versionName = versionName
         manifestPlaceholders["appName"] = appName
         manifestPlaceholders["privacyPolicyUrl"] = privacyPolicyUrl
-        manifestPlaceholders["versionName"] = versionName
-        manifestPlaceholders["versionCode"] = versionCode.toString()
     }
 
     signingConfigs {
