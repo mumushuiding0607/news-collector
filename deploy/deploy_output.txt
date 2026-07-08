@@ -1,0 +1,27 @@
+=================================================================
+  News Collector - Deployment Script
+=================================================================
+[OK] Config loaded: root@39.105.23.221:22 - /opt/app
+Successfully processed 0 files; Failed processing 1 files
+[OK] Files found
+=================================================================
+  Server: root@39.105.23.221:22
+  Path:   /opt/app
+=================================================================
+
+[STEP 1] Create remote dir...
+[OK]
+[STEP 2] Upload requirements.txt [SKIPPED]...
+[SKIP]
+[STEP 3] Install Python deps [SKIPPED]...
+[SKIP]
+[STEP 4] Upload project files [SKIPPED]...
+[SKIP]
+[STEP 4b] Stop old services...
+[OK]
+[STEP 5] Start uvicorn backend...
+[OK]
+[STEP 6] Health check...
+{"status":"ok","time":"2026-07-09 01:48:45","version":"1.0.49"}[OK] Backend running
+[OK]
+[STEP 7] Start scheduler...
