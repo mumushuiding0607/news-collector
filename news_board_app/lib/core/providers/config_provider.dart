@@ -715,9 +715,14 @@ class ApiConfig {
 
       final api = json['api'] as Map<String, dynamic>?;
       if (api != null) {
+        var prodUrl = api['baseUrlProd'] as String? ?? api['baseUrl'] as String? ?? 'http://localhost:31234';
+        // 占位符未替换时降级到 localhost
+        if (prodUrl.contains('__SERVER_IP__')) {
+          prodUrl = 'http://localhost:31234';
+        }
         _baseUrl = kIsWeb
             ? (api['baseUrl'] as String? ?? 'http://localhost:31234')
-            : (api['baseUrlProd'] as String? ?? api['baseUrl'] as String? ?? 'http://YOUR_SERVER_IP:31234');
+            : prodUrl;
       }
 
       final timeouts = json['timeouts'] as Map<String, dynamic>?;
@@ -727,12 +732,12 @@ class ApiConfig {
         _createOrderTimeout = timeouts['createOrder'] as int? ?? 15;
       }
     } catch (e) {
-      _baseUrl = kIsWeb ? 'http://localhost:31234' : 'http://39.105.23.221:31234';
+      _baseUrl = kIsWeb ? 'http://localhost:31234' : 'http://localhost:31234';
     }
   }
 
   static String get baseUrl => _baseUrl.isEmpty
-      ? (kIsWeb ? 'http://localhost:31234' : 'http://39.105.23.221:31234')
+      ? (kIsWeb ? 'http://localhost:31234' : 'http://localhost:31234')
       : _baseUrl;
   static int get defaultTimeout => _defaultTimeout;
   static int get sourceTimeout => _sourceTimeout;
