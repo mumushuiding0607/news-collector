@@ -17,7 +17,7 @@ class NewsListState {
     this.hotNews = const [],
     this.latestNews = const [],
     this.historyNews = const [],
-    this.viewMode = 'hot',
+    this.viewMode = 'latest',
     this.batchTime = '',
     this.isLoading = false,
     this.errorMessage,

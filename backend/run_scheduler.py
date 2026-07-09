@@ -169,6 +169,7 @@ def _build_subprocess_cmd(handler: str, news_type: str = "股市新闻") -> list
         "script.discovery.source_discovery.discover_and_schedule": _prefix + "from script.discovery.source_discovery import discover_and_schedule; discover_and_schedule()",
         "script.anomaly_news.summary.generate": _prefix + "from script.anomaly_news.summary import generate; generate()",
         "backend.service.news_stocks.sync_news_stocks_change_rates": _prefix + "from backend.service.news_stocks import sync_news_stocks_change_rates; sync_news_stocks_change_rates()",
+        "backend.service.ai_news_pipeline.run_pipeline": _prefix + "from backend.service.ai_news_pipeline import run_pipeline; run_pipeline()",
     }
     if handler not in _handlers:
         raise ValueError(f"不支持的 handler: {handler}")

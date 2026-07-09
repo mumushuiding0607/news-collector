@@ -22,8 +22,9 @@ void main() async {
     systemNavigationBarIconBrightness: Brightness.light,
   ));
 
-  // 加载 .env 环境变量（敏感配置如 SERVER_IP）
-  await dotenv.load(fileName: '.env');
+  // 加载敏感配置（从 assets 加载，避免文件系统依赖）
+  final envStr = await rootBundle.loadString('assets/env.json');
+  dotenv.loadFromString(envString: envStr);
 
   // 在 runApp 前加载 API 配置，确保任何请求发出前配置已就绪
   await ApiConfig.loadFromConfig();

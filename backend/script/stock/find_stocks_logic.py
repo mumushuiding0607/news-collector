@@ -63,8 +63,8 @@ def parse_stocks_from_json(text: str) -> list[dict]:
                 'moat': item.get('moat', ''),
                 'news_related': item.get('news_related', ''),
             }
-            if 'news_index' in item:
-                stock['news_index'] = item['news_index']
+            if 'news_id' in item:
+                stock['news_id'] = item['news_id']
             stocks.append(stock)
         return stocks
     except (json.JSONDecodeError, KeyError):
@@ -87,13 +87,14 @@ def build_batch_prompt(news_list: list[dict]) -> str:
     """构建批量新闻的提示词"""
     template = _get_template()
     blocks = []
-    for i, news in enumerate(news_list):
+    for news in news_list:
         parts = []
+        parts.append(f"news_id：{news['id']}")
         if news.get("title"):
             parts.append(f"标题：{news['title']}")
         if news.get("summary"):
             parts.append(f"摘要：{news['summary']}")
-        blocks.append(f"--- 新闻{i} ---\n" + "\n".join(parts))
+        blocks.append("\n".join(parts))
     news_content = "\n\n".join(blocks)
     return template.replace("<<news_content>>", news_content)
 
@@ -166,7 +167,7 @@ async def _run_find_stocks(dry_run: bool, min_score: int) -> dict:
 
     for batch in batches:
         # 构建批量 prompt
-        news_list = [{"title": row[3] or "", "summary": row[6] or ""} for row in batch]
+        news_list = [{"id": row[0], "title": row[3] or "", "summary": row[6] or ""} for row in batch]
         prompt = build_batch_prompt(news_list)
         batch_ids = [row[0] for row in batch]
         batch_titles = [row[3][:30] for row in batch]
@@ -199,12 +200,12 @@ async def _run_find_stocks(dry_run: bool, min_score: int) -> dict:
         else:
             log(f"  -> 批次 {batch_ids} 解析出 {len(stocks)} 只，示例: {stocks[:2]}")
 
-        # news_index 缺失时用 round-robin 兜底（LLM 有时不返回 news_index）
+        # 按 news_id 直接归因，news_id 缺失时用 round-robin 兜底
         id_to_stocks: dict[int, list[dict]] = {bid: [] for bid in batch_ids}
         for s in stocks:
-            idx = s.pop("news_index", None)
-            if idx is not None and 0 <= idx < len(batch_ids):
-                id_to_stocks[batch_ids[idx]].append(s)
+            news_id = s.pop("news_id", None)
+            if news_id is not None and news_id in batch_ids:
+                id_to_stocks[news_id].append(s)
             else:
                 # round-robin 兜底：依次分配给 batch 内的各条新闻
                 id_to_stocks[batch_ids[round_robin % len(batch_ids)]].append(s)

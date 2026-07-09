@@ -303,13 +303,33 @@ class _NewsListPageState extends ConsumerState<NewsListPage> with SingleTickerPr
     if (newsState.viewMode == 'hot') msg = texts.emptyHot;
     if (newsState.viewMode == 'latest') msg = texts.emptyLatest;
 
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+    return RefreshIndicator(
+      onRefresh: () async {
+        final newsType = ref.read(newsTypeProvider);
+        if (newsType == NewsType.ai) {
+          await ref.read(newsListProvider.notifier).loadAiNews();
+        } else {
+          await ref.read(newsListProvider.notifier).refresh();
+        }
+      },
+      color: theme.accentGoldColor,
+      backgroundColor: theme.backgroundStartColor,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          Icon(Icons.inbox_outlined, color: theme.textMutedColor, size: 64),
-          const SizedBox(height: 16),
-          Text(msg, style: TextStyle(color: theme.textMutedColor, fontSize: 16)),
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.6,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.inbox_outlined, color: theme.textMutedColor, size: 64),
+                  const SizedBox(height: 16),
+                  Text(msg, style: TextStyle(color: theme.textMutedColor, fontSize: 16)),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

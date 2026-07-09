@@ -54,6 +54,15 @@
       "enabled": true,
       "trigOnDeploy": false,
       "handler": "script.log.log_cleanup.cleanup_old_logs"
+    },
+    {
+      "id": "ai_news_pipeline",
+      "name": "AI新闻采集评分",
+      "description": "每天早上7点运行AI新闻采集评分完整流程",
+      "cron": "0 0 7 * * *",
+      "enabled": true,
+      "trigOnDeploy": false,
+      "handler": "backend.service.ai_news_pipeline.run_pipeline"
     }
   ]
 }

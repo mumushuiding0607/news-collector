@@ -14,6 +14,8 @@ migrate_working_dir/
 
 # Environment variables (sensitive)
 .env
+assets/.env
+assets/env.json
 
 # IntelliJ related
 *.iml
