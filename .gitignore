@@ -30,4 +30,6 @@ __pycache__/
 .pem.env
 .env
 .pem
+news_collector.pem
+*.pem
 superpowers/
