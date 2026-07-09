@@ -9,6 +9,7 @@ WeChat Pay API 工具
 """
 
 import hashlib
+import os
 import random
 import time
 import xml.etree.ElementTree as ET
@@ -163,7 +164,7 @@ class WeChatPayAPI:
             "notify_url": notify_url,
             "amount": {"total": amount, "currency": "CNY"},
             "scene_info": {
-                "payer_client_ip": "39.105.23.221",
+                "payer_client_ip": os.environ.get("SERVER_IP", ""),
                 "h5_info": {"type": "Wap"},
             },
             "h5": {"type": "Wap", "wap_url": h5_redirect_url, "wap_name": "新闻看板"},

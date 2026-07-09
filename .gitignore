@@ -8,7 +8,7 @@ aliyun_key.pub
 logs/
 test/
 rag_reports/
-publish/apk/
+publish/
 
 # Python
 __pycache__/

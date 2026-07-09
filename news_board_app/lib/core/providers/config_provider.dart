@@ -717,7 +717,7 @@ class ApiConfig {
       if (api != null) {
         _baseUrl = kIsWeb
             ? (api['baseUrl'] as String? ?? 'http://localhost:31234')
-            : (api['baseUrlProd'] as String? ?? api['baseUrl'] as String? ?? 'http://39.105.23.221:31234');
+            : (api['baseUrlProd'] as String? ?? api['baseUrl'] as String? ?? 'http://YOUR_SERVER_IP:31234');
       }
 
       final timeouts = json['timeouts'] as Map<String, dynamic>?;
