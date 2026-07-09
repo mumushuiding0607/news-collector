@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/repositories/config_repository.dart';
@@ -713,16 +714,16 @@ class ApiConfig {
       final jsonStr = await rootBundle.loadString('config.json');
       final json = jsonDecode(jsonStr) as Map<String, dynamic>;
 
+      // 从 .env 读取真实 IP（敏感配置），不放在 config.json 中
+      final serverIp = dotenv.env['SERVER_IP'] ?? 'localhost';
+      final serverPort = dotenv.env['SERVER_PORT'] ?? '31234';
+      final prodBaseUrl = 'http://$serverIp:$serverPort';
+
       final api = json['api'] as Map<String, dynamic>?;
       if (api != null) {
-        var prodUrl = api['baseUrlProd'] as String? ?? api['baseUrl'] as String? ?? 'http://localhost:31234';
-        // 占位符未替换时降级到 localhost
-        if (prodUrl.contains('__SERVER_IP__')) {
-          prodUrl = 'http://localhost:31234';
-        }
         _baseUrl = kIsWeb
             ? (api['baseUrl'] as String? ?? 'http://localhost:31234')
-            : prodUrl;
+            : prodBaseUrl;
       }
 
       final timeouts = json['timeouts'] as Map<String, dynamic>?;
@@ -732,13 +733,21 @@ class ApiConfig {
         _createOrderTimeout = timeouts['createOrder'] as int? ?? 15;
       }
     } catch (e) {
-      _baseUrl = kIsWeb ? 'http://localhost:31234' : 'http://localhost:31234';
+      // fallback 到 .env 中的值
+      final serverIp = dotenv.env['SERVER_IP'] ?? 'localhost';
+      final serverPort = dotenv.env['SERVER_PORT'] ?? '31234';
+      _baseUrl = kIsWeb ? 'http://localhost:31234' : 'http://$serverIp:$serverPort';
     }
   }
 
-  static String get baseUrl => _baseUrl.isEmpty
-      ? (kIsWeb ? 'http://localhost:31234' : 'http://localhost:31234')
-      : _baseUrl;
+  static String get baseUrl {
+    if (_baseUrl.isEmpty) {
+      final serverIp = dotenv.env['SERVER_IP'] ?? 'localhost';
+      final serverPort = dotenv.env['SERVER_PORT'] ?? '31234';
+      return kIsWeb ? 'http://localhost:31234' : 'http://$serverIp:$serverPort';
+    }
+    return _baseUrl;
+  }
   static int get defaultTimeout => _defaultTimeout;
   static int get sourceTimeout => _sourceTimeout;
   static int get createOrderTimeout => _createOrderTimeout;

@@ -2,17 +2,27 @@
 $OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 $ErrorActionPreference = "Continue"
-$env:SSH_KEY = "C:/Users/18145/.openclaw/workspace/news-collector/deploy/aliyun"
-$env:SERVER_IP = "39.105.23.221"
-$env:SERVER_USER = "root"
-$env:SERVER_PORT = "22"
-$env:REMOTE_PATH = "/opt/app"
 
-$SSH_KEY = "C:/Users/18145/.openclaw/workspace/news-collector/deploy/aliyun"
-$SERVER_IP = "39.105.23.221"
-$SERVER_USER = "root"
-$SERVER_PORT = "22"
-$REMOTE_PATH = "/opt/app"
+# 从 deploy/.env 读取敏感配置
+$DotEnvPath = Join-Path $PSScriptRoot ".env"
+if (Test-Path $DotEnvPath) {
+    Get-Content $DotEnvPath | ForEach-Object {
+        if ($_ -match '^([^=]+)=(.*)$') {
+            [Environment]::SetEnvironmentVariable($matches[1].Trim(), $matches[2].Trim())
+        }
+    }
+}
+
+$SSH_KEY = $env:SSH_KEY
+$SERVER_IP = $env:SERVER_IP
+$SERVER_USER = $env:SERVER_USER
+$SERVER_PORT = $env:SERVER_PORT
+$REMOTE_PATH = $env:REMOTE_PATH
+
+# SSH_KEY 相对路径转为绝对路径
+if ($SSH_KEY -and -not [System.IO.Path]::IsPathRooted($SSH_KEY)) {
+    $SSH_KEY = Join-Path $PSScriptRoot $SSH_KEY
+}
 
 function Invoke-SSH {
     param($cmd)
@@ -58,13 +68,13 @@ Write-Host "  Step 3: Upload Project Files"
 Write-Host "================================================================"
 
 Write-Host "[INFO] Uploading .env..."
-Invoke-SCP "C:/Users/18145/.openclaw/workspace/news-collector/backend/.env" "$REMOTE_PATH/backend/.env"
+Invoke-SCP (Join-Path $PSScriptRoot "../backend/.env") "$REMOTE_PATH/backend/.env"
 
 Write-Host "[INFO] Uploading requirements.txt..."
-Invoke-SCP "C:/Users/18145/.openclaw/workspace/news-collector/backend/requirements.txt" "$REMOTE_PATH/requirements.txt"
+Invoke-SCP (Join-Path $PSScriptRoot "../backend/requirements.txt") "$REMOTE_PATH/requirements.txt"
 
 Write-Host "[INFO] Uploading backend directory..."
-& scp -i $SSH_KEY -o StrictHostKeyChecking=no -o LogLevel=ERROR -r -P $SERVER_PORT "C:/Users/18145/.openclaw/workspace/news-collector/backend" "$SERVER_USER@$SERVER_IP`:$REMOTE_PATH" 2>&1 | Out-Null
+& scp -i $SSH_KEY -o StrictHostKeyChecking=no -o LogLevel=ERROR -r -P $SERVER_PORT (Join-Path $PSScriptRoot "../backend") "$SERVER_USER@$SERVER_IP`:$REMOTE_PATH" 2>&1 | Out-Null
 
 Write-Host "[OK] Upload complete"
 
@@ -98,7 +108,7 @@ Write-Host "================================================================"
 Write-Host "  Step 5-7: Stop, Start and Health Check"
 Write-Host "================================================================"
 Write-Host "[INFO] Uploading remote deployment script..."
-Invoke-SCP "C:/Users/18145/.openclaw/workspace/news-collector/deploy/_deploy_remote.py" "/tmp/_deploy_remote.py"
+Invoke-SCP (Join-Path $PSScriptRoot "_deploy_remote.py") "/tmp/_deploy_remote.py"
 
 Write-Host "[INFO] Running remote deployment script..."
 Invoke-SSH "REMOTE_PATH='$REMOTE_PATH' python3 /tmp/_deploy_remote.py deploy"

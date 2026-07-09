@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/providers/config_provider.dart';
@@ -20,6 +21,9 @@ void main() async {
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarIconBrightness: Brightness.light,
   ));
+
+  // 加载 .env 环境变量（敏感配置如 SERVER_IP）
+  await dotenv.load(fileName: '.env');
 
   // 在 runApp 前加载 API 配置，确保任何请求发出前配置已就绪
   await ApiConfig.loadFromConfig();

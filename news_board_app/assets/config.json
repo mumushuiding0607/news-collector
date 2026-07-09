@@ -1,7 +1,6 @@
 {
   "api": {
-    "baseUrl": "http://127.0.0.1:31234",
-    "baseUrlProd": "http://__SERVER_IP__:31234"
+    "baseUrl": "http://127.0.0.1:31234"
   },
   "timeouts": {
     "default": 10,
