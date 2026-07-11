@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    android:versionCode="49"
-    android:versionName="1.0.49">
+    android:versionCode="53"
+    android:versionName="1.0.53">
     <!-- 隐私政策（商店审核必需） -->
     <uses-permission android:name="android.permission.INTERNET"/>
           <application

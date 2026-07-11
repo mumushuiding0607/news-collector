@@ -211,7 +211,7 @@ class SideDrawer extends ConsumerWidget {
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
         leading: Icon(Icons.article_outlined, color: iconColor, size: 22),
-        title: Text('新闻类型', style: TextStyle(color: textColor, fontSize: 15)),
+        title: Text('资讯类型', style: TextStyle(color: textColor, fontSize: 15)),
         tilePadding: const EdgeInsets.only(left: 4, right: 8),
         childrenPadding: const EdgeInsets.only(left: 48),
         expandedAlignment: Alignment.centerLeft,
@@ -219,7 +219,7 @@ class SideDrawer extends ConsumerWidget {
           _buildTreeItem(
             context, ref,
             icon: Icons.show_chart,
-            label: '股市新闻',
+            label: '股市资讯',
             selected: currentType == NewsType.stock,
             iconColor: Colors.green,
             onTap: () {
@@ -233,7 +233,7 @@ class SideDrawer extends ConsumerWidget {
           _buildTreeItem(
             context, ref,
             icon: Icons.smart_toy_outlined,
-            label: 'AI新闻',
+            label: 'AI资讯',
             selected: currentType == NewsType.ai,
             iconColor: Colors.purple,
             onTap: () {

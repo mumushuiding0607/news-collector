@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../data/models/news_item.dart';
 
-/// AI 新闻详情弹窗（全屏 WebView）
+/// AI 新闻详情弹窗（全屏 WebView）- Android 实现
 class AiNewsDetailDialog extends ConsumerWidget {
   final AiNewsItem news;
 
@@ -39,7 +39,9 @@ class AiNewsDetailDialog extends ConsumerWidget {
 
 class _WebViewContent extends StatefulWidget {
   final String url;
+
   const _WebViewContent({required this.url});
+
   @override
   State<_WebViewContent> createState() => _WebViewContentState();
 }
@@ -53,11 +55,13 @@ class _WebViewContentState extends State<_WebViewContent> {
     super.initState();
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(NavigationDelegate(
-        onPageStarted: (_) => setState(() => _isLoading = true),
-        onPageFinished: (_) => setState(() => _isLoading = false),
-        onWebResourceError: (e) => debugPrint('WebView error: ${e.description}'),
-      ))
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (_) => setState(() => _isLoading = true),
+          onPageFinished: (_) => setState(() => _isLoading = false),
+          onWebResourceError: (e) => debugPrint('WebView error: ${e.description}'),
+        ),
+      )
       ..loadRequest(Uri.parse(widget.url));
   }
 
@@ -66,7 +70,8 @@ class _WebViewContentState extends State<_WebViewContent> {
     return Stack(
       children: [
         WebViewWidget(controller: _controller),
-        if (_isLoading) const Center(child: CircularProgressIndicator()),
+        if (_isLoading)
+          const Center(child: CircularProgressIndicator()),
       ],
     );
   }

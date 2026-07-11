@@ -242,24 +242,34 @@ echo [OK] Upload complete
 
 echo.
 echo ================================================================
-echo   Step 4b: Stop old services
+echo   Step 5: Stop old main.py
 echo ================================================================
-!SSH_FULL! "pkill -f 'uvicorn backend.main:app' 2>/dev/null || true; pkill -f 'run_scheduler' 2>/dev/null || true; echo 'old processes stopped'"
-echo [OK] Old services stopped
+!SSH_FULL! "pkill -9 -f 'uvicorn.*backend.main' 2>/dev/null || true; echo 'main.py stopped'"
+echo [OK] main.py stopped
 
-REM ================================================================
-REM Step 5-7: Start services
-REM ================================================================
 echo.
 echo ================================================================
-echo   Step 5-7: Start Backend and Scheduler
+echo   Step 6: Start main.py
 echo ================================================================
-set "TODAY=%DATE:~0,4%-%DATE:~5,2%-%DATE:~8,2%"
-for /f "delims=" %%i in ('powershell -Command "Get-Date -Format 'yyyy-MM-dd'"') do set "TODAY=%%i"
-!SSH_FULL! "mkdir -p '%REMOTE_PATH%/logs/%TODAY%'"
-!SSH_FULL! "cd '%REMOTE_PATH%' && nohup python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 31234 > '%REMOTE_PATH%/logs/%TODAY%/global.log' 2>&1 &"
-!SSH_FULL! "cd '%REMOTE_PATH%' && nohup python3 backend/run_scheduler.py >> '%REMOTE_PATH%/logs/%TODAY%/scheduler.log' 2>&1 &"
-!SSH_FULL! "sleep 5 && curl -s --max-time 10 http://localhost:31234/api/health && echo '[OK] Backend is running' || echo '[ERROR] Backend not responding'"
+start /b "" !SSH_FULL! "bash -c 'cd ''%REMOTE_PATH%'' && nohup python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 31234 > /dev/null 2>&1 &'"
+echo 启动成功
+timeout /t 1 /nobreak >nul
+!SSH_FULL! "sleep 3 && curl -s --max-time 5 http://localhost:31234/api/health && echo '[OK] main.py is running' || echo '[ERROR] main.py not responding'"
+echo [OK] main.py started
+
+echo.
+echo ================================================================
+echo   Step 7: Stop old run_scheduler
+echo ================================================================
+!SSH_FULL! "pkill -9 -f 'run_scheduler' 2>/dev/null || true; echo 'run_scheduler stopped'"
+echo [OK] run_scheduler stopped
+
+echo.
+echo ================================================================
+echo   Step 8: Start run_scheduler
+echo ================================================================
+start /b "" !SSH_FULL! "bash -c 'cd ''%REMOTE_PATH%'' && nohup python3 backend/run_scheduler.py >> ''%REMOTE_PATH%/logs/%TODAY%/scheduler.log'' 2>&1 &'"
+echo [OK] run_scheduler started
 
 echo.
 echo ================================================================
@@ -292,6 +302,6 @@ echo   Deployment Complete!
 echo ================================================================
 echo   Access:   http://!SERVER_IP!:31234/api/health
 for /f "tokens=*" %%a in ('!SSH_FULL! "echo Logs: tail -f /var/log/news_collector.log" 2^>nul') do echo   %%a
-for /f "tokens=*" %%a in ('!SSH_FULL! "echo Stop: pkill -f 'uvicorn backend.main:app'" 2^>nul') do echo   %%a
+for /f "tokens=*" %%a in ('!SSH_FULL! "echo Stop: pkill -9 -f 'uvicorn.*backend.main'" 2^>nul') do echo   %%a
 for /f "tokens=*" %%a in ('!SSH_FULL! "echo Scheduler: tail -f /var/log/news_scheduler.log" 2^>nul') do echo   %%a
 echo ================================================================

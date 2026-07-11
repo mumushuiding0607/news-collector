@@ -46,13 +46,15 @@ class DimsLabelsConfig {
 /// 功能开关配置
 class FeaturesConfig {
   final bool commentsEnabled;
+  final bool shareEnabled;
   final bool feedbackEnabled;
   final bool notificationsEnabled;
   final bool sourceManagementEnabled;
   final bool subscriptionEnabled;
 
   const FeaturesConfig({
-    this.commentsEnabled = true,
+    this.commentsEnabled = false,
+    this.shareEnabled = false,
     this.feedbackEnabled = true,
     this.notificationsEnabled = false,
     this.sourceManagementEnabled = true,
@@ -61,7 +63,8 @@ class FeaturesConfig {
 
   factory FeaturesConfig.fromJson(Map<String, dynamic> json) {
     return FeaturesConfig(
-      commentsEnabled: _boolFrom(json['comments_enabled']) ?? true,
+      commentsEnabled: _boolFrom(json['comments_enabled']) ?? false,
+      shareEnabled: _boolFrom(json['share_enabled']) ?? false,
       feedbackEnabled: _boolFrom(json['feedback_enabled']) ?? true,
       notificationsEnabled: _boolFrom(json['notifications_enabled']) ?? false,
       sourceManagementEnabled: _boolFrom(json['source_management_enabled']) ?? true,
@@ -422,8 +425,8 @@ class TextsConfig {
     this.loading = '加载中...',
     this.retry = '重试',
     this.emptyData = '暂无数据',
-    this.emptyHot = '暂无热点新闻',
-    this.emptyLatest = '暂无最新新闻',
+    this.emptyHot = '暂无热点资讯',
+    this.emptyLatest = '暂无最新资讯',
   });
 
   factory TextsConfig.fromJson(Map<String, dynamic> json) {
@@ -431,8 +434,8 @@ class TextsConfig {
       loading: json['loading'] as String? ?? '加载中...',
       retry: json['retry'] as String? ?? '重试',
       emptyData: json['empty_data'] as String? ?? '暂无数据',
-      emptyHot: json['empty_hot'] as String? ?? '暂无热点新闻',
-      emptyLatest: json['empty_latest'] as String? ?? '暂无最新新闻',
+      emptyHot: json['empty_hot'] as String? ?? '暂无热点资讯',
+      emptyLatest: json['empty_latest'] as String? ?? '暂无最新资讯',
     );
   }
 }

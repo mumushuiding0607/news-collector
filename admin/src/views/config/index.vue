@@ -15,6 +15,8 @@ const appForm = ref({
   sms_login_enabled: true,
   password_login_enabled: true,
   subscription_enabled: true,
+  comments_enabled: false,
+  share_enabled: false,
 });
 
 const envForm = ref({
@@ -61,6 +63,8 @@ async function fetchConfig() {
         sms_login_enabled: Boolean(appData["sms_login_enabled"]),
         password_login_enabled: Boolean(appData["password_login_enabled"]),
         subscription_enabled: Boolean(features["subscription_enabled"] ?? true),
+        comments_enabled: Boolean(features["comments_enabled"] ?? false),
+        share_enabled: Boolean(features["share_enabled"] ?? false),
       };
     }
     if (envData) {
@@ -99,11 +103,13 @@ async function handleSaveApp() {
   saving.value = true;
   try {
     // 提取 features 中的字段，其余为顶级配置
-    const { subscription_enabled, ...rest } = appForm.value;
+    const { subscription_enabled, comments_enabled, share_enabled, ...rest } = appForm.value;
     const payload = {
       ...rest,
       features: {
         subscription_enabled,
+        comments_enabled,
+        share_enabled,
       },
     };
     await updateAppConfig(payload);
@@ -174,6 +180,12 @@ onMounted(fetchConfig);
             </el-form-item>
             <el-form-item label="订阅功能">
               <el-switch v-model="appForm.subscription_enabled" />
+            </el-form-item>
+            <el-form-item label="评论功能">
+              <el-switch v-model="appForm.comments_enabled" />
+            </el-form-item>
+            <el-form-item label="分享功能">
+              <el-switch v-model="appForm.share_enabled" />
             </el-form-item>
             <el-form-item>
               <el-button type="primary" :loading="saving" @click="handleSaveApp">保存配置</el-button>

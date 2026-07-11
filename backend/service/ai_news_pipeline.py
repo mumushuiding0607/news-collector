@@ -127,6 +127,11 @@ def run_pipeline(start_step: int = 1, end_step: int | None = None) -> None:
     log("=" * 60)
 
     init_db()
+
+    # 确保 pipeline 以 AI新闻 类型运行（schedule_service 直调时绕过了 _parse_args）
+    from script.bootstrap import set_news_type as _set
+    _set("AI新闻")
+
     started = datetime.now()
 
     try:

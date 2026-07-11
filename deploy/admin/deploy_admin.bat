@@ -29,20 +29,20 @@ if exist "!ENV_FILE!" (
 )
 
 REM ================================================================
-REM SSH key path - resolve relative path and fix permissions
+REM SSH key path - resolve relative path and convert to forward slashes
 REM ================================================================
 if defined SSH_KEY (
     set "SSH_KEY_FULL=!PROJECT_ROOT!\!SSH_KEY!"
 )
 goto :after_keypath
 :convert_keypath
-for /f "delims=" %%i in ('powershell -Command "[System.IO.Path]::GetFullPath('%~1')"') do set "SSH_KEY_ABS=%%i"
+for /f "delims=" %%i in ('powershell -Command "$p = [System.IO.Path]::GetFullPath('%~1'); $p.Replace('\\','/')"') do set "SSH_KEY_ABS=%%i"
 exit /b 0
 :after_keypath
 if defined SSH_KEY (
     call :convert_keypath "!SSH_KEY_FULL!"
     if defined SSH_KEY_ABS (
-        icacls "!SSH_KEY_ABS!" /inheritance:r /grant:r "!USERNAME!:R" >nul 2>&1
+        icacls "!SSH_KEY_FULL!" /inheritance:r /grant:r "!USERNAME!:R" >nul 2>&1
     )
 )
 
@@ -105,7 +105,7 @@ if not exist "!ADMIN_DIR!\dist" (
 REM Create remote directory (clean)
 echo [INFO] Cleaning remote directory...
 if defined SSH_KEY_ABS (
-    ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "rm -rf !REMOTE_PATH!/admin/*"
+    ssh -p !SERVER_PORT! -i "!SSH_KEY_ABS!" !SERVER_USER!@!SERVER_IP! "rm -rf !REMOTE_PATH!/admin/*"
 ) else (
     ssh -p !SERVER_PORT! !SERVER_USER!@!SERVER_IP! "rm -rf !REMOTE_PATH!/admin/*"
 )
@@ -113,9 +113,9 @@ if defined SSH_KEY_ABS (
 REM Upload build files
 echo [INFO] Uploading build files...
 if defined SSH_KEY_ABS (
-    scp -P !SERVER_PORT! -i '!SSH_KEY_ABS!' -r '!ADMIN_DIR!\dist'/* !SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/admin/
+    scp -P !SERVER_PORT! -i "!SSH_KEY_ABS!" -r "!ADMIN_DIR!\dist"/* !SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/admin/
 ) else (
-    scp -P !SERVER_PORT! -r '!ADMIN_DIR!\dist'/* !SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/admin/
+    scp -P !SERVER_PORT! -r "!ADMIN_DIR!\dist"/* !SERVER_USER!@!SERVER_IP!:!REMOTE_PATH!/admin/
 )
 if errorlevel 1 (
     echo [ERROR] Upload failed
@@ -128,10 +128,10 @@ echo.
 echo [INFO] Checking remote Node.js environment...
 
 REM Check if npm is available on remote server
-ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "command -v npm"
+ssh -p !SERVER_PORT! -i "!SSH_KEY_ABS!" !SERVER_USER!@!SERVER_IP! "command -v npm"
 if errorlevel 1 (
     echo [WARN] npm not found on remote server, attempting to install Node.js...
-    ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs"
+    ssh -p !SERVER_PORT! -i "!SSH_KEY_ABS!" !SERVER_USER!@!SERVER_IP! "curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs"
     if errorlevel 1 (
         echo [ERROR] Node.js installation failed. Please install Node.js on the server manually.
         exit /b 1
@@ -142,7 +142,7 @@ if errorlevel 1 (
 )
 
 REM Check and install PM2 if needed
-ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "command -v pm2 || npm install -g pm2"
+ssh -p !SERVER_PORT! -i "!SSH_KEY_ABS!" !SERVER_USER!@!SERVER_IP! "command -v pm2 || npm install -g pm2"
 if errorlevel 1 (
     echo [ERROR] PM2 installation failed
     exit /b 1
@@ -150,10 +150,10 @@ if errorlevel 1 (
 echo [OK] PM2 ready
 
 REM Stop and delete existing service (ignore errors)
-ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "pm2 stop admin-web 2>/dev/null; pm2 delete admin-web 2>/dev/null; true"
+ssh -p !SERVER_PORT! -i "!SSH_KEY_ABS!" !SERVER_USER!@!SERVER_IP! "pm2 stop admin-web 2>/dev/null; pm2 delete admin-web 2>/dev/null; true"
 
 REM Start new service (SPA mode for Vue router)
-ssh -p !SERVER_PORT! -i '!SSH_KEY_ABS!' !SERVER_USER!@!SERVER_IP! "pm2 serve !REMOTE_PATH!/admin --name admin-web --port 5173 --spa"
+ssh -p !SERVER_PORT! -i "!SSH_KEY_ABS!" !SERVER_USER!@!SERVER_IP! "pm2 serve !REMOTE_PATH!/admin --name admin-web --port 5173 --spa"
 echo [OK] Service restarted
 
 REM ================================================================

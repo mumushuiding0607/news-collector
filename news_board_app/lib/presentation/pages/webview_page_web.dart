@@ -1,6 +1,6 @@
 // ignore_for_file: avoid_web_libraries
 import 'dart:html' as html;
-import 'dart:ui' as ui;
+import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/material.dart';
 
@@ -29,7 +29,7 @@ class _WebViewPageState extends State<WebViewPage> {
   void _registerIframe() {
     if (_registered) return;
     _registered = true;
-    ui.platformViewRegistry.registerViewFactory(
+    ui_web.platformViewRegistry.registerViewFactory(
       _viewType,
       (int viewId) {
         final iframe = html.IFrameElement()

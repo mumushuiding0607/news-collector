@@ -7,6 +7,7 @@ import 'core/providers/config_provider.dart';
 import 'core/providers/version_provider.dart';
 import 'core/router/app_router.dart';
 import 'core/providers/subscription_provider.dart';
+import 'presentation/widgets/privacy_consent_dialog.dart';
 
 late SharedPreferences gPrefs;
 
@@ -29,6 +30,9 @@ void main() async {
   // 在 runApp 前加载 API 配置，确保任何请求发出前配置已就绪
   await ApiConfig.loadFromConfig();
 
+  // 检查隐私政策同意状态
+  final consented = await checkPrivacyConsent();
+
   runApp(ProviderScope(
     overrides: [
       themeModeProvider.overrideWith((ref) {
@@ -36,7 +40,9 @@ void main() async {
         return ThemeModeNotifier(gPrefs);
       }),
     ],
-    child: const NewsBoardApp(),
+    child: consented
+        ? const NewsBoardApp()
+        : PrivacyGate(child: const NewsBoardApp()),
   ));
 }
 
@@ -76,6 +82,7 @@ class _NewsBoardAppState extends ConsumerState<NewsBoardApp> with WidgetsBinding
     // API 配置已在 main() 中通过 await 加载，此处只加载应用配置
     await ref.read(configProvider.notifier).load();
 
+  
     // 配置加载完成后检查更新
     if (!_updateChecked) {
       _updateChecked = true;

@@ -156,6 +156,11 @@ def _run_task_in_background(task_id: str, handler: str):
             run_pipeline()
             logger.info(f"[Schedule] 任务 {task_id} 执行完成")
 
+        elif handler == "backend.service.ai_news_pipeline.run_pipeline":
+            from backend.service.ai_news_pipeline import run_pipeline
+            run_pipeline()
+            logger.info(f"[Schedule] 任务 {task_id} 执行完成")
+
         else:
             logger.error(f"[Schedule] 不支持的 handler: {handler}")
 

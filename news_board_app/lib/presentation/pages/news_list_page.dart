@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/providers/config_provider.dart';
 import '../../core/providers/news_provider.dart';
 import '../../core/providers/auth_provider.dart';
@@ -7,7 +9,7 @@ import '../../core/providers/news_type_provider.dart';
 import '../../data/models/news_item.dart';
 import '../widgets/news_card.dart';
 import '../widgets/ai_news_card.dart';
-import '../widgets/ai_news_detail_dialog.dart';
+import '../widgets/ai_news_detail_dialog.dart' if (dart.library.html) '../widgets/ai_news_detail_stub.dart';
 import '../widgets/side_drawer.dart';
 
 class NewsListPage extends ConsumerStatefulWidget {

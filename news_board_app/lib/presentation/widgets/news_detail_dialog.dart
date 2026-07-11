@@ -45,8 +45,9 @@ class _NewsDetailDialogState extends ConsumerState<NewsDetailDialog> {
         pixelRatio: 2.5,
         builder: (ctx) {
         final isDark = ref.watch(themeModeProvider) == AppThemeMode.dark;
+        final configInCapture = ref.watch(configProvider);
         final captureMaxH = MediaQuery.of(context).size.height * 0.9;
-        return _buildBody(includeInteractive: false, isDark: isDark, captureMaxHeight: captureMaxH);
+        return _buildBody(includeInteractive: false, isDark: isDark, captureMaxHeight: captureMaxH, config: configInCapture);
       },
       );
 
@@ -59,8 +60,10 @@ class _NewsDetailDialogState extends ConsumerState<NewsDetailDialog> {
         return;
       }
 
-      // 弹出分享弹窗显示图片
-      ShareSheet.showWithImage(context, widget.news, bytes);
+      // 弹出分享弹窗显示图片（默认关闭）
+      if (ref.watch(configProvider).features.shareEnabled) {
+        ShareSheet.showWithImage(context, widget.news, bytes);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -78,6 +81,7 @@ class _NewsDetailDialogState extends ConsumerState<NewsDetailDialog> {
   Widget build(BuildContext context) {
     final isDark = ref.watch(themeModeProvider) == AppThemeMode.dark;
     final bgColor = isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF8F6F3);
+    final config = ref.watch(configProvider);
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -88,9 +92,9 @@ class _NewsDetailDialogState extends ConsumerState<NewsDetailDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(context, isDark),
+              _buildHeader(context, isDark, config),
               const SizedBox(height: 16),
-              _buildBody(isDark: isDark),
+              _buildBody(isDark: isDark, config: config),
             ],
           ),
         ),
@@ -102,7 +106,7 @@ class _NewsDetailDialogState extends ConsumerState<NewsDetailDialog> {
   ///
   /// [includeInteractive] 是否包含交互组件（评论、反馈按钮）。
   /// [captureMaxHeight] 截图时的最大高度，超出部分不截取（仅截图用，不影响正常显示）。
-  Widget _buildBody({bool includeInteractive = true, required bool isDark, double? captureMaxHeight}) {
+  Widget _buildBody({bool includeInteractive = true, required bool isDark, double? captureMaxHeight, required AppConfig config}) {
     final news = widget.news;
     final textMuted = isDark ? Colors.white54 : const Color(0xFF9B9B9B);
     final hasEvaluation = news.direction != null ||
@@ -164,7 +168,7 @@ class _NewsDetailDialogState extends ConsumerState<NewsDetailDialog> {
           NewsDetailStocksSection(stocks: news.coreStocksPreview),
           const SizedBox(height: 16),
         ],
-        if (includeInteractive) ...[
+        if (includeInteractive && config.features.commentsEnabled) ...[
           const SizedBox(height: 4),
           CommentSection(newsId: news.id),
           const SizedBox(height: 16),
@@ -193,9 +197,10 @@ class _NewsDetailDialogState extends ConsumerState<NewsDetailDialog> {
     return body;
   }
 
-  Widget _buildHeader(BuildContext context, bool isDark) {
+  Widget _buildHeader(BuildContext context, bool isDark, AppConfig config) {
     final textPrimary = isDark ? Colors.white : const Color(0xFF1C1C1E);
     final textMuted = isDark ? Colors.white54 : const Color(0xFF9B9B9B);
+    final shareEnabled = config.features.shareEnabled;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -210,16 +215,17 @@ class _NewsDetailDialogState extends ConsumerState<NewsDetailDialog> {
             ),
           ),
         ),
-        IconButton(
-          onPressed: _isCapturing ? null : _onShare,
-          icon: _isCapturing
-              ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: textMuted),
-                )
-              : Icon(Icons.share, color: textMuted),
-        ),
+        if (shareEnabled)
+          IconButton(
+            onPressed: _isCapturing ? null : _onShare,
+            icon: _isCapturing
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: textMuted),
+                  )
+                : Icon(Icons.share, color: textMuted),
+          ),
         IconButton(
           onPressed: () => Navigator.pop(context),
           icon: Icon(Icons.close, color: textMuted),
