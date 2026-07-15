@@ -59,7 +59,7 @@
       "id": "ai_news_pipeline",
       "name": "AI新闻采集评分",
       "description": "每天早上7点运行AI新闻采集评分完整流程",
-      "cron": "0 0 7 * * *",
+      "cron": "0 0 23 * * *",
       "enabled": true,
       "trigOnDeploy": false,
       "handler": "backend.service.ai_news_pipeline.run_pipeline"

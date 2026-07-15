@@ -724,9 +724,13 @@ class ApiConfig {
 
       final api = json['api'] as Map<String, dynamic>?;
       if (api != null) {
-        _baseUrl = kIsWeb
-            ? (api['baseUrl'] as String? ?? 'http://localhost:31234')
-            : prodBaseUrl;
+        if (kIsWeb) {
+          // Web 端始终使用本地开发服务器
+          _baseUrl = 'http://localhost:31234';
+        } else {
+          // Android/iOS 使用远程服务器
+          _baseUrl = prodBaseUrl;
+        }
       }
 
       final timeouts = json['timeouts'] as Map<String, dynamic>?;
@@ -736,18 +740,27 @@ class ApiConfig {
         _createOrderTimeout = timeouts['createOrder'] as int? ?? 15;
       }
     } catch (e) {
-      // fallback 到 .env 中的值
-      final serverIp = dotenv.env['SERVER_IP'] ?? 'localhost';
-      final serverPort = dotenv.env['SERVER_PORT'] ?? '31234';
-      _baseUrl = kIsWeb ? 'http://localhost:31234' : 'http://$serverIp:$serverPort';
+      // fallback：web 使用本地，Android 使用 .env 中的远程 IP
+      if (kIsWeb) {
+        _baseUrl = 'http://localhost:31234';
+      } else {
+        final serverIp = dotenv.env['SERVER_IP'] ?? 'localhost';
+        final serverPort = dotenv.env['SERVER_PORT'] ?? '31234';
+        _baseUrl = 'http://$serverIp:$serverPort';
+      }
     }
   }
 
   static String get baseUrl {
     if (_baseUrl.isEmpty) {
-      final serverIp = dotenv.env['SERVER_IP'] ?? 'localhost';
-      final serverPort = dotenv.env['SERVER_PORT'] ?? '31234';
-      return kIsWeb ? 'http://localhost:31234' : 'http://$serverIp:$serverPort';
+      // 未调用 loadFromConfig 时，web 使用本地，Android 使用 .env
+      if (kIsWeb) {
+        return 'http://localhost:31234';
+      } else {
+        final serverIp = dotenv.env['SERVER_IP'] ?? 'localhost';
+        final serverPort = dotenv.env['SERVER_PORT'] ?? '31234';
+        return 'http://$serverIp:$serverPort';
+      }
     }
     return _baseUrl;
   }

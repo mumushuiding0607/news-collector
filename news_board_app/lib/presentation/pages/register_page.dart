@@ -35,16 +35,22 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       return;
     }
     setState(() => _isLoading = true);
-    final ok = await ref.read(authProvider.notifier).sendCode(_emailController.text);
-    setState(() => _isLoading = false);
+    bool ok = false;
+    try {
+      ok = await ref.read(authProvider.notifier).sendCode(_emailController.text);
+    } catch (e) {
+      // API 错误已由 ApiClient._checkError 以弹窗形式处理
+      // 等待 3 秒让用户看到错误提示
+      await Future.delayed(const Duration(seconds: 3));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
     if (ok && mounted) {
       setState(() {
         _codeSent = true;
         _countdown = 60;
       });
       _startCountdown();
-    } else {
-      _showError('发送失败，请稍后重试');
     }
   }
 
@@ -79,13 +85,20 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
     setState(() => _isLoading = true);
 
-    final ok = await ref.read(authProvider.notifier).register(
-      _emailController.text,
-      _passwordController.text,
-      _codeController.text,
-    );
-
-    setState(() => _isLoading = false);
+    bool ok = false;
+    try {
+      ok = await ref.read(authProvider.notifier).register(
+        _emailController.text,
+        _passwordController.text,
+        _codeController.text,
+      );
+    } catch (e) {
+      // API 错误已由 ApiClient._checkError 以弹窗形式处理
+      // 此处等待 3 秒让用户看到错误提示
+      await Future.delayed(const Duration(seconds: 3));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
 
     if (ok && mounted) {
       showDialog(
@@ -101,8 +114,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         ),
       );
     } else {
-      final err = ref.read(authProvider).errorMessage;
-      _showError(err ?? '注册失败');
+      // API 错误已由 ApiClient._checkError 以弹窗形式处理
+      // 此处不再重复弹框
     }
   }
 
