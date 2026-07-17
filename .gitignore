@@ -33,3 +33,6 @@ __pycache__/
 news_collector.pem
 *.pem
 superpowers/
+
+# 数据库文件
+*.db
