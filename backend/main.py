@@ -29,6 +29,7 @@ from backend.api import (
     news_router,
     schedule_router,
     subscription_router,
+    wechat_router,
 )
 from backend.api.config_api import get_app_config, update_app_config, get_app_version_config
 from script.log import init_log, api_exception_handler, request_log_middleware
@@ -91,6 +92,7 @@ app.include_router(comments_router, prefix="/api")
 app.include_router(config_router, prefix="/api")
 app.include_router(log_router, prefix="/api")
 app.include_router(schedule_router, prefix="/api")
+app.include_router(wechat_router, prefix="/api")
 
 
 @app.get("/api/config")

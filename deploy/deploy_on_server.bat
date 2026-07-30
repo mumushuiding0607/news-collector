@@ -301,7 +301,4 @@ echo ================================================================
 echo   Deployment Complete!
 echo ================================================================
 echo   Access:   http://!SERVER_IP!:31234/api/health
-for /f "tokens=*" %%a in ('!SSH_FULL! "echo Logs: tail -f /var/log/news_collector.log" 2^>nul') do echo   %%a
-for /f "tokens=*" %%a in ('!SSH_FULL! "echo Stop: pkill -9 -f 'uvicorn.*backend.main'" 2^>nul') do echo   %%a
-for /f "tokens=*" %%a in ('!SSH_FULL! "echo Scheduler: tail -f /var/log/news_scheduler.log" 2^>nul') do echo   %%a
-echo ================================================================
+

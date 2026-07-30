@@ -13,6 +13,7 @@ from backend.api.feedback import comments_router
 from backend.api.config_api import router as config_router
 from backend.api.schedule_api import router as schedule_router
 from backend.api.log_api import router as log_router
+from backend.api.wechat_token import router as wechat_router
 
 __all__ = [
     "admin_router",
@@ -24,6 +25,7 @@ __all__ = [
     "config_router",
     "schedule_router",
     "log_router",
+    "wechat_router",
 ]
 
 # 默认 router（向后兼容）
