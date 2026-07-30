@@ -7,6 +7,8 @@ import { useNewsList } from "./useNewsList";
 import { useNewsTypeStore } from "../../stores/newsType";
 import type { NewsTab } from "./types";
 import DeleteDateDialog from "./dialogs/DeleteDateDialog.vue";
+import DeleteDateBeforeDialog from "./dialogs/DeleteDateBeforeDialog.vue";
+import DeleteScoreDialog from "./dialogs/DeleteScoreDialog.vue";
 
 const props = defineProps<{ tab: NewsTab; pipelineSteps: { step: number; name: string; desc: string; logFile: string }[] }>();
 const emit = defineEmits<{
@@ -20,6 +22,8 @@ const { loading, tableData, pagination, filterForm, fetchList, markUseful, handl
 
 const sourceNameOptions = ref<string[]>([]);
 const deleteDateVisible = ref(false);
+const deleteDateBeforeVisible = ref(false);
+const deleteScoreVisible = ref(false);
 
 async function fetchSourceNames() {
   try {
@@ -77,10 +81,14 @@ defineExpose({ refresh });
         <el-select v-model="filterForm.source_name" placeholder="来源" clearable filterable style="width: 160px">
           <el-option v-for="name in sourceNameOptions" :key="name" :label="name" :value="name" />
         </el-select>
+        <el-input v-model="filterForm.title" placeholder="标题搜索" clearable style="width: 160px" />
+        <el-input v-model="filterForm.summary" placeholder="摘要搜索" clearable style="width: 160px" v-if="tab === 'importance'" />
         <el-button type="primary" @click="doSearch">搜索</el-button>
         <el-button @click="doReset">重置</el-button>
         <div style="flex: 1" />
         <el-button v-if="tab === 'primary'" type="danger" @click="deleteDateVisible = true">删除指定日期</el-button>
+        <el-button v-if="tab === 'primary'" type="danger" @click="deleteDateBeforeVisible = true">删除日期之前</el-button>
+        <el-button v-if="tab === 'importance'" type="danger" @click="deleteScoreVisible = true">删除分数</el-button>
         <el-dropdown v-if="pipelineSteps.length > 0" trigger="click" @command="(cmd: number) => { const s = pipelineSteps.find(p => p.step === cmd); if (s) emit('open-pipeline', s.step, s.desc) }">
           <el-button type="success">
             执行步骤 <el-icon class="el-icon--right"><MoreFilled /></el-icon>
@@ -105,12 +113,16 @@ defineExpose({ refresh });
           <el-option label="已推送" value="pushed" />
           <el-option label="异常" value="error" />
         </el-select>
+        <el-input v-model="filterForm.title" placeholder="标题搜索" clearable style="width: 100%" />
+        <el-input v-model="filterForm.summary" placeholder="摘要搜索" clearable style="width: 100%" v-if="tab === 'importance'" />
         <div style="display: flex; gap: 8px">
           <el-button type="primary" style="flex: 1" @click="doSearch">搜索</el-button>
           <el-button style="flex: 1" @click="doReset">重置</el-button>
         </div>
         <div style="display: flex; gap: 8px">
           <el-button v-if="tab === 'primary'" type="danger" style="flex: 1" @click="deleteDateVisible = true">删除指定日期</el-button>
+          <el-button v-if="tab === 'primary'" type="danger" style="flex: 1" @click="deleteDateBeforeVisible = true">删除日期之前</el-button>
+          <el-button v-if="tab === 'importance'" type="danger" style="flex: 1" @click="deleteScoreVisible = true">删除分数</el-button>
           <el-dropdown v-if="pipelineSteps.length > 0" trigger="click" style="flex: 1" @command="(cmd: number) => { const s = pipelineSteps.find(p => p.step === cmd); if (s) emit('open-pipeline', s.step, s.desc) }">
             <el-button type="success" style="width: 100%">
               执行步骤 <el-icon class="el-icon--right"><MoreFilled /></el-icon>
@@ -226,5 +238,7 @@ defineExpose({ refresh });
     </el-card>
 
     <DeleteDateDialog v-model:visible="deleteDateVisible" @deleted="refresh" />
+    <DeleteDateBeforeDialog v-model:visible="deleteDateBeforeVisible" @deleted="refresh" />
+    <DeleteScoreDialog v-model:visible="deleteScoreVisible" @deleted="refresh" />
   </div>
 </template>

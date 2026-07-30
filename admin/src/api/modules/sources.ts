@@ -26,9 +26,22 @@ export const getCrawlConfigSourceNames = (news_type: string = "stock") =>
 export const deletePrimarySourcesByDate = (date: string) =>
   api.delete("/api/admin/primary_sources/by_date", { params: { date } });
 
+export const deletePrimarySourcesByDateBefore = (date: string) =>
+  api.delete("/api/admin/primary_sources/before_date", { params: { date } });
+
+export const deleteImportanceByScore = (score: number) =>
+  api.delete("/api/admin/news/by_score", { params: { score } });
+
 export const getPrimarySourceDetail = (id: number) =>
   api.get(`/api/admin/primary_sources/${id}`);
 
 // 异动消息
 export const getAnomalyNews = (params: { sourceName?: string; title?: string; processed?: number; page?: number; limit?: number }) =>
   api.get("/api/admin/anomaly-news", { params });
+
+export const deleteAnomalyNewsBeforeDate = (date: string) =>
+  api.delete("/api/admin/anomaly-news/before_date", { params: { date } });
+
+// 简报
+export const deleteSummaryBeforeDate = (date: string) =>
+  api.delete("/api/admin/summaries/before_date", { params: { date } });

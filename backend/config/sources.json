@@ -10,6 +10,7 @@
   "newsCache": {
     "minScore": 5,
     "hotNewsMinScore": 8,
-    "historyDays": 3
+    "historyDays": 3,
+    "latestNewsCount": 20
   }
 }

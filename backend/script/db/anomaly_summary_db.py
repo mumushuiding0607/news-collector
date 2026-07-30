@@ -239,3 +239,14 @@ def list_summaries_by_date(page: int = 1, limit: int = 20, summary_type: str | N
     ]
 
     return {"total": total, "page": page, "limit": limit, "items": items}
+
+
+def delete_summary_before_date(date_str: str) -> int:
+    """删除指定日期之前的所有简报，返回删除数量"""
+    conn = get_conn()
+    try:
+        cursor = conn.execute("DELETE FROM summary WHERE date < ?", (date_str,))
+        conn.commit()
+        return cursor.rowcount
+    finally:
+        put_conn(conn)

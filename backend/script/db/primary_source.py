@@ -332,6 +332,27 @@ def delete_by_fetched_date(date_str: str, commit: bool = True, conn=None) -> int
             put_conn(conn)
 
 
+def delete_by_fetched_date_before(date_str: str, commit: bool = True, conn=None) -> int:
+    """
+    删除指定日期之前的原始数据（fetched_at < date_str），返回删除数量。
+    date_str 格式：YYYY-MM-DD
+    """
+    must_close = conn is None
+    if conn is None:
+        conn = get_conn()
+    try:
+        cursor = conn.execute(
+            "DELETE FROM primary_sources WHERE fetched_at < ?",
+            (date_str + " 00:00:00",)
+        )
+        if commit:
+            conn.commit()
+        return cursor.rowcount
+    finally:
+        if must_close:
+            put_conn(conn)
+
+
 def update_content(news_id: int, content: str, content_length: int, publish_time: str, commit: bool = True, conn=None) -> bool:
     """更新文章正文内容"""
     must_close = conn is None

@@ -82,6 +82,7 @@ def batch_save_anomaly_news(anomalies: list[dict]) -> int:
 def get_anomaly_news(
     source_name: str = None,
     title: str = None,
+    keyword: str = None,
     limit: int = 100,
     offset: int = 0,
     processed: int | None = None,
@@ -97,6 +98,10 @@ def get_anomaly_news(
         if title:
             where_clauses.append("title LIKE ?")
             params.append(f"%{title}%")
+        if keyword:
+            where_clauses.append("(title LIKE ? OR content LIKE ?)")
+            params.append(f"%{keyword}%")
+            params.append(f"%{keyword}%")
         if processed is not None:
             where_clauses.append("processed = ?")
             params.append(processed)
@@ -110,7 +115,7 @@ def get_anomaly_news(
         put_conn(conn)
 
 
-def count_anomaly_news(source_name: str = None, title: str = None, processed: int | None = None) -> int:
+def count_anomaly_news(source_name: str = None, title: str = None, keyword: str = None, processed: int | None = None) -> int:
     """统计异动消息数量（用于分页总数）"""
     conn = get_conn()
     try:
@@ -122,6 +127,10 @@ def count_anomaly_news(source_name: str = None, title: str = None, processed: in
         if title:
             where_clauses.append("title LIKE ?")
             params.append(f"%{title}%")
+        if keyword:
+            where_clauses.append("(title LIKE ? OR content LIKE ?)")
+            params.append(f"%{keyword}%")
+            params.append(f"%{keyword}%")
         if processed is not None:
             where_clauses.append("processed = ?")
             params.append(processed)
@@ -252,6 +261,20 @@ def delete_anomaly_news(id: int) -> bool:
         return True
     except Exception:
         return False
+    finally:
+        put_conn(conn)
+
+
+def delete_anomaly_news_before_date(date_str: str) -> int:
+    """删除指定日期之前的所有异动消息，返回删除数量"""
+    conn = get_conn()
+    try:
+        cursor = conn.execute(
+            "DELETE FROM anomaly_news WHERE publish_time < ?",
+            (date_str,)
+        )
+        conn.commit()
+        return cursor.rowcount
     finally:
         put_conn(conn)
 

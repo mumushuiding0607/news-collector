@@ -25,10 +25,12 @@ from script.db.admin_db import (
     list_crawl_configs, set_crawl_config_checked, delete_crawl_config, update_crawl_config,
     create_crawl_config,
 )
-from script.db.primary_source import delete_by_fetched_date
+from script.db.primary_source import delete_by_fetched_date, delete_by_fetched_date_before
+from script.db.news_db import delete_importance_by_score
 from script.db.anomaly_news import (
     get_anomaly_news_by_date, get_latest_anomaly_date, get_anomaly_news,
     get_anomaly_news_by_source_latest_date,
+    delete_anomaly_news_before_date,
 )
 from script.anomaly_news.summary import generate as _generate_summary
 
@@ -133,12 +135,19 @@ def generate_anomaly_summary_service(date_str: str | None = None, limit: int = 2
     return _generate_summary(date_str=date_str, limit=limit)
 
 
-def get_anomaly_news_service(source_name: str | None = None, title: str | None = None, processed: int | None = None, page: int = 1, limit: int = 20):
+def delete_summary_before_date_service(date_str: str) -> dict:
+    """删除指定日期之前的所有简报"""
+    from script.db.anomaly_summary_db import delete_summary_before_date as _delete
+    deleted = _delete(date_str)
+    return {"deleted": deleted, "date": date_str}
+
+
+def get_anomaly_news_service(source_name: str | None = None, title: str | None = None, keyword: str | None = None, processed: int | None = None, page: int = 1, limit: int = 20):
     """分页查询异动消息列表"""
     from script.db.anomaly_news import get_anomaly_news as _get_anomaly_news, count_anomaly_news as _count_anomaly_news
     offset = (page - 1) * limit
-    total = _count_anomaly_news(source_name=source_name, title=title, processed=processed)
-    rows = _get_anomaly_news(source_name=source_name, title=title, limit=limit, offset=offset, processed=processed)
+    total = _count_anomaly_news(source_name=source_name, title=title, keyword=keyword, processed=processed)
+    rows = _get_anomaly_news(source_name=source_name, title=title, keyword=keyword, limit=limit, offset=offset, processed=processed)
     return {
         "list": [{"id": r[0], "title": r[1], "url": r[2], "publish_time": r[3], "source_name": r[4], "processed": r[5], "created_at": r[6]} for r in rows],
         "total": total,
@@ -152,6 +161,12 @@ def delete_anomaly_news_service(news_id: int) -> dict:
     from script.db.anomaly_news import delete_anomaly_news as _delete
     ok = _delete(news_id)
     return {"deleted": ok, "id": news_id}
+
+
+def delete_anomaly_news_before_date_service(date_str: str) -> dict:
+    """删除指定日期之前的所有异动消息"""
+    deleted = delete_anomaly_news_before_date(date_str)
+    return {"deleted": deleted, "date": date_str}
 
 
 def mark_anomaly_processed_service(news_id: int) -> dict:
@@ -175,6 +190,18 @@ def delete_primary_sources_by_date_service(date_str: str) -> dict:
     """删除指定抓取日期的原始数据，返回删除数量"""
     deleted = delete_by_fetched_date(date_str)
     return {"deleted": deleted, "date": date_str}
+
+
+def delete_primary_sources_by_date_before_service(date_str: str) -> dict:
+    """删除指定日期之前的所有原始数据，返回删除数量"""
+    deleted = delete_by_fetched_date_before(date_str)
+    return {"deleted": deleted, "date": date_str}
+
+
+def delete_importance_by_score_service(min_score: float) -> dict:
+    """删除评分低于指定分数的重要新闻，返回删除数量"""
+    deleted = delete_importance_by_score(min_score)
+    return {"deleted": deleted, "min_score": min_score}
 
 
 # ============ 评论管理 ============

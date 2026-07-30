@@ -22,11 +22,15 @@ from backend.core.admin_service import (
     generate_anomaly_summary_service,
     get_anomaly_news_service,
     delete_anomaly_news_service,
+    delete_anomaly_news_before_date_service,
+    delete_summary_before_date_service,
     mark_anomaly_processed_service,
     mark_all_anomaly_processed_service,
     get_comments_service,
     get_feedback_summary_service,
     delete_primary_sources_by_date_service,
+    delete_primary_sources_by_date_before_service,
+    delete_importance_by_score_service,
 )
 from backend.api._auth import get_user_email, require_admin
 
@@ -247,6 +251,33 @@ def delete_primary_sources_by_date(request: Request, date: str):
     return delete_primary_sources_by_date_service(date)
 
 
+@router.delete("/primary_sources/before_date")
+def delete_primary_sources_by_date_before(request: Request, date: str):
+    """
+    删除指定日期之前的所有原始数据新闻。
+    date 格式：YYYY-MM-DD，删除该日期之前（不含当天）的所有记录。
+    """
+    require_admin(request)
+    return delete_primary_sources_by_date_before_service(date)
+
+
+@router.delete("/news/by_score")
+def delete_importance_by_score(request: Request, score: float):
+    """
+    删除评分低于指定分数的重要新闻。
+    score：低于此分数的新闻将被删除。
+    """
+    require_admin(request)
+    return delete_importance_by_score_service(score)
+
+
+@router.delete("/anomaly-news/before_date")
+def delete_anomaly_news_before_date(request: Request, date: str):
+    """删除指定日期之前的所有异动消息"""
+    require_admin(request)
+    return delete_anomaly_news_before_date_service(date)
+
+
 # ============ 异动简报 ============
 
 
@@ -273,6 +304,13 @@ def list_summaries_admin(
     return list_summaries_by_date(page=page, limit=limit, summary_type=type)
 
 
+@router.delete("/summaries/before_date")
+def delete_summaries_before_date(request: Request, date: str):
+    """删除指定日期之前的所有简报"""
+    require_admin(request)
+    return delete_summary_before_date_service(date)
+
+
 @router.get("/summary/{date}")
 def get_summary_by_date_admin(
     request: Request,
@@ -295,13 +333,14 @@ def list_anomaly_news(
     request: Request,
     sourceName: str | None = Query(None, alias="sourceName"),
     title: str | None = None,
+    keyword: str | None = None,
     processed: int | None = None,
     page: int = 1,
     limit: int = 20,
 ):
-    """分页查询异动消息列表"""
+    """分页查询异动消息列表，支持关键词搜索（模糊匹配 title 和 content）"""
     require_admin(request)
-    return get_anomaly_news_service(source_name=sourceName, title=title, processed=processed, page=page, limit=limit)
+    return get_anomaly_news_service(source_name=sourceName, title=title, keyword=keyword, processed=processed, page=page, limit=limit)
 
 
 @router.delete("/anomaly-news/{news_id}")

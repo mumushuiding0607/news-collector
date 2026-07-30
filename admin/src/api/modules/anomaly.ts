@@ -1,6 +1,6 @@
 import api from "../client";
 
-export const getAnomalyNewsList = (params: { source_name?: string; processed?: number; page?: number; limit?: number }) =>
+export const getAnomalyNewsList = (params: { sourceName?: string; source_name?: string; title?: string; keyword?: string; processed?: number; page?: number; limit?: number }) =>
   api.get("/api/admin/anomaly-news", { params });
 
 export const deleteAnomalyNews = (id: number) =>

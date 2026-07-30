@@ -39,6 +39,7 @@ const sourcesForm = ref({
     minScore: 5,
     hotNewsMinScore: 8,
     historyDays: 3,
+    latestNewsCount: 10,
   },
 });
 
@@ -89,6 +90,7 @@ async function fetchConfig() {
           minScore: (sourcesData["newsCache"] as Record<string, unknown>)?.["minScore"] as number ?? 5,
           hotNewsMinScore: (sourcesData["newsCache"] as Record<string, unknown>)?.["hotNewsMinScore"] as number ?? 8,
           historyDays: (sourcesData["newsCache"] as Record<string, unknown>)?.["historyDays"] as number ?? 3,
+          latestNewsCount: (sourcesData["newsCache"] as Record<string, unknown>)?.["latestNewsCount"] as number ?? 10,
         },
       };
     }
@@ -258,6 +260,9 @@ onMounted(fetchConfig);
             </el-form-item>
             <el-form-item label="历史天数">
               <el-input-number v-model="sourcesForm.newsCache.historyDays" :min="1" :max="30" />
+            </el-form-item>
+            <el-form-item label="最新新闻显示数量">
+              <el-input-number v-model="sourcesForm.newsCache.latestNewsCount" :min="1" :max="100" />
             </el-form-item>
 
             <el-form-item>

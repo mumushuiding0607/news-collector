@@ -35,6 +35,7 @@ NEWS_URL_PATTERNS = [
     r'detail-\d{8}-[a-zA-Z0-9]+\.html',  # detail-20210524-1820254.html（无前导/）
     r'/html/\d{4}/\d{4}/',  # /html/2022/1207/xxx.html 格式
     r'/\d+/\d+/\d+\.htm',  # /1/850/850982.htm 或 /1/1129/1129586.htm 格式
+    r'/themeDetails/\d+',  # 华创证券等券商平台文章详情页
 ]
 NEWS_URL_REGEX = re.compile('|'.join(NEWS_URL_PATTERNS), re.IGNORECASE)
 

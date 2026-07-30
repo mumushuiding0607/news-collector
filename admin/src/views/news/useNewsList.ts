@@ -8,7 +8,7 @@ export function useNewsList() {
   const loading = ref(false);
   const tableData = ref<Record<string, unknown>[]>([]);
   const pagination = ref({ page: 1, limit: 20, total: 0 });
-  const filterForm = ref({ status: "", source_name: "" });
+  const filterForm = ref({ status: "", source_name: "", title: "", summary: "" });
 
   async function fetchList(tab: TabType) {
     loading.value = true;
@@ -46,6 +46,8 @@ export function useNewsList() {
         limit: pagination.value.limit,
         status: filterForm.value.status || undefined,
         source_name: filterForm.value.source_name || undefined,
+        title: filterForm.value.title || undefined,
+        summary: filterForm.value.summary || undefined,
       };
       const fetcher = tab === "importance" ? getNewsList : getPrimarySourcesList;
       const res = (await fetcher(params)) as { list?: Record<string, unknown>[]; total?: number };
@@ -72,7 +74,7 @@ export function useNewsList() {
   }
 
   function handleReset() {
-    filterForm.value = { status: "", source_name: "" };
+    filterForm.value = { status: "", source_name: "", title: "", summary: "" };
     pagination.value.page = 1;
   }
 

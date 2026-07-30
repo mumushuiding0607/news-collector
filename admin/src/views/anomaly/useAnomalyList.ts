@@ -6,7 +6,7 @@ export function useAnomalyList() {
   const loading = ref(false);
   const tableData = ref<Record<string, unknown>[]>([]);
   const pagination = ref({ page: 1, limit: 20, total: 0 });
-  const filterForm = ref({ source_name: "", title: "", processed: "" as "" | "0" | "1" });
+  const filterForm = ref({ source_name: "", title: "", keyword: "", processed: "" as "" | "0" | "1" });
 
   async function fetchData() {
     loading.value = true;
@@ -17,6 +17,7 @@ export function useAnomalyList() {
       };
       if (filterForm.value.source_name) params.source_name = filterForm.value.source_name;
       if (filterForm.value.title) params.title = filterForm.value.title;
+      if (filterForm.value.keyword) params.keyword = filterForm.value.keyword;
       if (filterForm.value.processed !== "") params.processed = parseInt(filterForm.value.processed);
       const res = (await getAnomalyNewsList(params)) as { list?: Record<string, unknown>[]; total?: number };
       tableData.value = res.list || [];
@@ -62,7 +63,7 @@ export function useAnomalyList() {
   }
 
   function handleReset() {
-    filterForm.value = { source_name: "", title: "", processed: "" };
+    filterForm.value = { source_name: "", title: "", keyword: "", processed: "" };
     pagination.value.page = 1;
     fetchData();
   }

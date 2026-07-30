@@ -6,6 +6,7 @@ import { useAnomalyList } from "./useAnomalyList";
 import { useAnomalyPipelines } from "./useAnomalyPipelines";
 import { newsPipelineSteps, sourcePipelineSteps } from "./pipelineConfig";
 import UrlPreviewDialog from "../../components/UrlPreviewDialog.vue";
+import DeleteAnomalyBeforeDialog from "../../views/news/dialogs/DeleteAnomalyBeforeDialog.vue";
 
 const { isMobile } = useMobile();
 const {
@@ -29,6 +30,7 @@ const pipelines = useAnomalyPipelines(emit);
 
 const previewVisible = ref(false);
 const previewUrl = ref("");
+const deleteBeforeVisible = ref(false);
 
 function openPreview(url: string) {
   previewUrl.value = url;
@@ -46,6 +48,7 @@ defineExpose({ refresh: fetchData });
       <div v-if="!isMobile" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
         <el-input v-model="filterForm.title" placeholder="标题" clearable style="width: 160px" />
         <el-input v-model="filterForm.source_name" placeholder="数据源名称" clearable style="width: 160px" />
+        <el-input v-model="filterForm.keyword" placeholder="关键词（搜标题+内容）" clearable style="width: 200px" />
         <el-select v-model="filterForm.processed" placeholder="处理状态" clearable style="width: 120px">
           <el-option label="未处理" value="0" />
           <el-option label="已处理" value="1" />
@@ -74,10 +77,12 @@ defineExpose({ refresh: fetchData });
             </el-dropdown-menu>
           </template>
         </el-dropdown>
+        <el-button type="danger" @click="deleteBeforeVisible = true">删除日期之前</el-button>
       </div>
       <div v-else style="display: flex; flex-direction: column; gap: 10px">
         <el-input v-model="filterForm.title" placeholder="标题" clearable />
         <el-input v-model="filterForm.source_name" placeholder="数据源名称" clearable />
+        <el-input v-model="filterForm.keyword" placeholder="关键词（搜标题+内容）" clearable />
         <el-select v-model="filterForm.processed" placeholder="处理状态" clearable style="width: 100%">
           <el-option label="未处理" value="0" />
           <el-option label="已处理" value="1" />
@@ -107,6 +112,7 @@ defineExpose({ refresh: fetchData });
             </el-dropdown-menu>
           </template>
         </el-dropdown>
+        <el-button type="danger" style="width: 100%" @click="deleteBeforeVisible = true">删除日期之前</el-button>
       </div>
     </el-card>
 
@@ -173,5 +179,6 @@ defineExpose({ refresh: fetchData });
     </el-card>
 
     <UrlPreviewDialog v-model:visible="previewVisible" :url="previewUrl" />
+    <DeleteAnomalyBeforeDialog v-model:visible="deleteBeforeVisible" @deleted="fetchData" />
   </div>
 </template>

@@ -1,18 +1,27 @@
 <script setup lang="ts">
 // 异动简报列表：复用通用 SummaryListView，通过 actions 插槽注入流水线步骤下拉
+import { ref } from "vue";
 import { MoreFilled } from "@element-plus/icons-vue";
 import SummaryListView from "../../components/SummaryListView.vue";
 import { useAnomalyPipelines } from "./useAnomalyPipelines";
 import { newsPipelineSteps, sourcePipelineSteps } from "./pipelineConfig";
+import DeleteSummaryBeforeDialog from "../../views/news/dialogs/DeleteSummaryBeforeDialog.vue";
 
 const emit = defineEmits<{
   (e: "open-log", title: string, file: string): void;
 }>();
 const pipelines = useAnomalyPipelines(emit);
+
+const summaryListRef = ref<InstanceType<typeof SummaryListView> | null>(null);
+const deleteBeforeVisible = ref(false);
+
+function onDeleted() {
+  summaryListRef.value?.refresh();
+}
 </script>
 
 <template>
-  <SummaryListView type="异动简报">
+  <SummaryListView ref="summaryListRef" type="异动简报">
     <template #actions>
       <el-dropdown trigger="click" @command="(cmd: number) => { if (cmd === 0) { pipelines.runNewsFull() } else { const s = newsPipelineSteps.find(p => p.step === cmd); if (s) pipelines.runNewsStep(s.step, s.desc) } }">
         <el-button type="success" size="small">
@@ -35,6 +44,8 @@ const pipelines = useAnomalyPipelines(emit);
           </el-dropdown-menu>
         </template>
       </el-dropdown>
+      <el-button type="danger" size="small" @click="deleteBeforeVisible = true">删除日期之前</el-button>
     </template>
   </SummaryListView>
+  <DeleteSummaryBeforeDialog v-model:visible="deleteBeforeVisible" @deleted="onDeleted" />
 </template>

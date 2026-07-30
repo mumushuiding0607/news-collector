@@ -99,19 +99,14 @@ def get_news_by_id(news_id: int) -> dict | None:
 
 def query_news_admin(where_clause: str, params: tuple, page: int, limit: int) -> tuple:
     """
-    新闻管理分页查询（关联 primary_sources 获取 status）。
+    新闻管理分页查询（直接查 importance 表）。
 
     Returns:
         (items: list[dict], total: int)
     """
     conn = get_conn()
     try:
-        count_sql = f"""
-            SELECT COUNT(*)
-            FROM importance i
-            JOIN primary_sources p ON p.id = i.news_id
-            WHERE {where_clause}
-        """
+        count_sql = f"SELECT COUNT(*) FROM importance i WHERE {where_clause}"
         total = conn.execute(count_sql, params).fetchone()[0]
 
         offset = (page - 1) * limit
@@ -119,12 +114,10 @@ def query_news_admin(where_clause: str, params: tuple, page: int, limit: int) ->
             SELECT i.id, i.title, i.url, i.source_name, i.publish_time,
                    i.summary, i.related_sectors, i.importance_score, i.reason,
                    i.publish_sector_values, i.current_sector_values,
-                   i.current_sector_change_rates, i.created_at,
-                   p.status, p.is_useful
+                   i.current_sector_change_rates, i.created_at
             FROM importance i
-            JOIN primary_sources p ON p.id = i.news_id
             WHERE {where_clause}
-            ORDER BY i.importance_score DESC, i.publish_time DESC
+            ORDER BY i.id DESC
             LIMIT ? OFFSET ?
         """
         rows = conn.execute(data_sql, (*params, limit, offset)).fetchall()
@@ -138,7 +131,7 @@ def query_news_admin(where_clause: str, params: tuple, page: int, limit: int) ->
                 "importance_score": r[7], "reason": r[8],
                 "publish_sector_values": r[9], "current_sector_values": r[10],
                 "current_sector_change_rates": r[11], "created_at": r[12],
-                "status": r[13], "is_useful": r[14],
+                "status": "scored",
             })
         return items, total
     finally:
@@ -186,5 +179,32 @@ def get_news_source_name(news_id: int) -> str | None:
             "SELECT source_name FROM primary_sources WHERE id = ?", (news_id,)
         ).fetchone()
         return row[0] if row else None
+    finally:
+        put_conn(conn)
+
+
+def delete_importance_by_score(min_score: float) -> int:
+    """
+    删除 importance 表中评分低于指定分数的新闻，返回删除数量。
+    同时删除关联的 primary_sources 记录（CASCADE）。
+    """
+    conn = get_conn()
+    try:
+        # 先找出要删除的 news_id
+        rows = conn.execute(
+            "SELECT id FROM importance WHERE importance_score < ?",
+            (min_score,),
+        ).fetchall()
+        news_ids = [r[0] for r in rows]
+        if not news_ids:
+            return 0
+        # 删除 importance 记录
+        placeholders = ",".join("?" * len(news_ids))
+        cursor = conn.execute(
+            f"DELETE FROM importance WHERE importance_score < ?",
+            (min_score,)
+        )
+        conn.commit()
+        return cursor.rowcount
     finally:
         put_conn(conn)

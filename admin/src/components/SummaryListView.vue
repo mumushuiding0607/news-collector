@@ -10,6 +10,8 @@ const { isMobile } = useMobile();
 const { loading, list, pagination, detail, detailVisible, fetchList, openDetail, onPageChange } = useSummaryList(props.type);
 
 onMounted(fetchList);
+
+defineExpose({ refresh: fetchList });
 </script>
 
 <template>

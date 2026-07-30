@@ -23,6 +23,19 @@ HOT_CACHE = _CACHE_DIR / "news_hot.json"
 SUMMARY_CACHE = _CACHE_DIR / "news_summary.json"
 
 
+def _load_news_cache_config() -> dict:
+    """从 sources.json 加载新闻缓存配置"""
+    import json
+    cfg_path = Path(__file__).resolve().parent.parent / "config" / "sources.json"
+    if not cfg_path.exists():
+        return {}
+    try:
+        data = json.loads(cfg_path.read_text(encoding="utf-8"))
+        return data.get("newsCache", {})
+    except Exception:
+        return {}
+
+
 def _get_user_id(request: Request) -> int | None:
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
     if not token:
@@ -216,8 +229,10 @@ def get_news_latest(request: Request):
     result = _load_cached_json(LATEST_CACHE)
     if not result:
         return {"data": [], "count": 0}
+    cfg = _load_news_cache_config()
+    limit = cfg.get("latestNewsCount", 10)
     data = result.get("data", [])
-    sorted_data = sorted(data, key=lambda x: x.get("importance_score", 0), reverse=True)[:10]
+    sorted_data = sorted(data, key=lambda x: x.get("importance_score", 0), reverse=True)[:limit]
     return {"data": sorted_data, "count": len(sorted_data)}
 
 
@@ -288,21 +303,25 @@ def get_news_detail(news_id: int, request: Request):
 
 @router.get("/news/list")
 def get_news_list(request: Request, page: int = 1, limit: int = 20,
-                  status: str | None = None, source_name: str | None = None):
+                  source_name: str | None = None,
+                  title: str | None = None, summary: str | None = None):
     """
     新闻管理分页列表（管理员）。
-    支持按 status 和 source_name 过滤，关联 primary_sources 获取 status。
+    支持按 source_name、title、summary 过滤。
     """
     # 构建 WHERE 子句
-    conditions = ["p.source_name IS NOT NULL"]
+    conditions = ["i.source_name IS NOT NULL"]
     params: tuple = ()
 
-    if status:
-        conditions.append("p.status = ?")
-        params = (*params, status)
     if source_name:
-        conditions.append("p.source_name LIKE ?")
+        conditions.append("i.source_name LIKE ?")
         params = (*params, f"%{source_name}%")
+    if title:
+        conditions.append("i.title LIKE ?")
+        params = (*params, f"%{title}%")
+    if summary:
+        conditions.append("i.summary LIKE ?")
+        params = (*params, f"%{summary}%")
 
     where_clause = " AND ".join(conditions)
 
@@ -315,10 +334,11 @@ def get_news_list(request: Request, page: int = 1, limit: int = 20,
 
 @router.get("/news/primary_sources")
 def get_primary_sources_list(request: Request, page: int = 1, limit: int = 20,
-                             status: str | None = None, source_name: str | None = None):
+                             status: str | None = None, source_name: str | None = None,
+                             title: str | None = None):
     """
     新闻管理分页列表（仅 primary_sources，按抓取时间降序）。
-    支持按 status 和 source_name 过滤。
+    支持按 status、source_name、title 过滤。
     """
     # 构建 WHERE 子句
     conditions = ["source_name IS NOT NULL"]
@@ -330,6 +350,9 @@ def get_primary_sources_list(request: Request, page: int = 1, limit: int = 20,
     if source_name:
         conditions.append("source_name LIKE ?")
         params = (*params, f"%{source_name}%")
+    if title:
+        conditions.append("title LIKE ?")
+        params = (*params, f"%{title}%")
 
     where_clause = " AND ".join(conditions)
 
