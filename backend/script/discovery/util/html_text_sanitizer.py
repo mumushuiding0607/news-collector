@@ -19,7 +19,7 @@ from bs4 import BeautifulSoup, NavigableString
 # 完全跳过文本替换的标签（其内容不会参与选择器分析）
 _SKIP_TAGS = frozenset({"script", "style", "noscript", "meta", "link", "title", "head", "html"})
 
-# 标题类标签：用"标题样例"替换
+# 标题类标签：用 __HEADING__ 替换（特殊占位符让 LLM 能识别这是语义标题）
 _TITLE_TAGS = frozenset({"h1", "h2", "h3", "h4", "h5", "h6"})
 
 # 日期/时间类标签：用"日期样例"替换
@@ -38,7 +38,7 @@ _LI_TAG = "li"
 def _placeholder_for(tag_name: str) -> str:
     """根据标签类型返回对应占位符"""
     if tag_name in _TITLE_TAGS:
-        return "标题样例"
+        return "__HEADING__"
     if tag_name in _DATETIME_TAGS:
         return "日期样例"
     if tag_name in _SUMMARY_TAGS:
@@ -48,6 +48,40 @@ def _placeholder_for(tag_name: str) -> str:
     if tag_name == _LI_TAG:
         return "列表项文字样例"
     return "普通文字样例"
+
+
+def _placeholder_for_text(tag) -> str:
+    """
+    根据标签类型和文本内容返回对应占位符。
+    如果标签是摘要类（p/span），但文本包含日期，返回日期占位符。
+    对于 p 标签，保留第一个 CSS 类名作为区分（如 p.text-md → 日期样例[text-md]）。
+    """
+    tag_name = tag.name
+    base = _placeholder_for(tag_name)
+
+    # 摘要类标签但文本包含日期 → 标记为日期
+    if tag_name in _SUMMARY_TAGS:
+        text = tag.get_text(strip=True)
+        if text:
+            from script.common.datetimeutil import DATETIME_REGEX
+            if DATETIME_REGEX.search(text):
+                # 提取第一个 CSS 类名用于区分
+                classes = tag.get('class', [])
+                cls_suffix = f"[{classes[0]}]" if classes else ""
+                return f"日期样例{cls_suffix}"
+
+    # p 标签有 CSS 类时，在占位符中保留类名以便 LLM 区分
+    if tag_name == 'p':
+        classes = tag.get('class', [])
+        if classes:
+            cls_suffix = f"[{classes[0]}]"
+            # 日期类（已有）或 摘要类
+            if "日期样例" in base:
+                return f"日期样例{cls_suffix}"
+            else:
+                return f"摘要样例{cls_suffix}"
+
+    return base
 
 
 def sanitize_html_for_llm(html: str) -> str:
@@ -86,7 +120,7 @@ def sanitize_html_for_llm(html: str) -> str:
         if not direct_text_nodes:
             continue
 
-        base = _placeholder_for(tag.name)
+        base = _placeholder_for_text(tag)
         n = counters.get(base, 0)
         replacement = f"{base}{n}" if n > 0 else base
         counters[base] = n + 1

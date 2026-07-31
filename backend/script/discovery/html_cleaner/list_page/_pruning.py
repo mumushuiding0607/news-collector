@@ -86,15 +86,16 @@ def _is_useless_element(tag) -> bool:
     # 这避免了"《第一时间》 20260615 1/2"这种节目整期链接被当作新闻保留。
     is_structural_item = tag.name in ('li', 'tr', 'article', 'section')
 
-    # 包含新闻链接 → 用新闻链接自身的标题判断是否保留，
-    # 不受容器 own_text 不足 10 字的影响
+    # 包含新闻链接 → 保留（不受 own_text 字符数影响）
     if _has_news_link_in_descendants(tag):
-        if is_structural_item and chinese_count < 10 and not DATETIME_REGEX.search(own_text):
-            return True
         return False
 
-    # 中文字符数 >= 10 → 保留
+    # 中文字符数 >= 10 → 保留（中文网站）
     if chinese_count >= 10:
+        return False
+
+    # 纯英文/其他字符：文本长度足够（>= 15 字符）认为是有意义文本
+    if len(own_text) >= 15:
         return False
 
     # 自身文本是日期/时间格式 → 保留
@@ -115,7 +116,7 @@ def _is_useless_element(tag) -> bool:
 
     # 检查是否有有意义的子元素
     for child in tag.children:
-        if not hasattr(child, 'name') or child.name in ['\n', '\r', '\t']:
+        if child.name is None or child.name in ['\n', '\r', '\t']:
             continue
         if not _is_useless_element(child):
             return False

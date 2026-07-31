@@ -251,6 +251,16 @@ def _find_element_by_text_content(element, tag_name, class_contains):
     return None
 
 
+def _is_element_before(el1, el2) -> bool:
+    """判断 el1 是否在 el2 之前（DOM 树中更靠前）"""
+    # 使用 BeautifulSoup 的 next/previous element 遍历来比较位置
+    # 顺着 el2 的 previous 遍历，如果遇到 el1 则 el1 在 el2 之前
+    for el in el2.previous_elements:
+        if el is el1:
+            return True
+    return False
+
+
 def _extract_tailwind_keyword(selector: str) -> str:
     """从 Tailwind CSS 选择器中提取类名字干，如 'h3.text-[15px]' -> 'text-'"""
     match = re.search(r'(text-\[?[^\s\]]+\]?)', selector)
@@ -377,6 +387,20 @@ def extract_with_css_selectors(html: str, source_name: str, list_config: dict, b
             if keyword:
                 title_el = _find_element_by_text_content(item, 'h3', keyword)
 
+        # 如果 title_sel 为 "a" 且 item 是 <a> 标签，先查找内部 heading 元素
+        # 避免提取到日期+作者+标题+摘要等全部文本
+        if not title_el and item.name == 'a' and title_sel == 'a':
+            heading_el = item.find(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+            if heading_el:
+                title_el = heading_el
+
+        # 如果 title_el 选中了 item 自身（即选择器返回了容器本身），且 item 内有 heading 子元素，
+        # 说明选择器太宽泛，语义上的标题是内部的 h1-h6，优先使用 heading（通用回退，适用于所有卡片式列表）
+        if title_el is item and item.name in ('a', 'div', 'section', 'article', 'li'):
+            heading_el = item.find(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+            if heading_el:
+                title_el = heading_el
+
         # 如果仍然没找到title元素，且item本身是链接，使用item本身
         if not title_el and item.name == 'a':
             title_el = item
@@ -445,6 +469,14 @@ def extract_with_css_selectors(html: str, source_name: str, list_config: dict, b
             try:
                 summary_el = item.select_one(summary_sel)
                 if summary_el:
+                    # 如果匹配的元素在 title 之前，可能是误匹配（日期/作者段落）
+                    # 尝试找后续的同类元素
+                    if title_el and summary_sel.startswith('p') and _is_element_before(summary_el, title_el):
+                        all_els = item.select(summary_sel)
+                        for el in all_els:
+                            if not _is_element_before(el, title_el):
+                                summary_el = el
+                                break
                     summary = summary_el.get_text(separator=' ', strip=True)[:MAX_SUBTITLE_LEN]
             except Exception:
                 # Fallback: 通过类名关键字查找

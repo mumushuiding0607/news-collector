@@ -67,6 +67,8 @@ DATETIME_PATTERNS = [
     r'\d{4}/\d{1,2}/\d{1,2}\s+\d{1,2}:\d{2}',              # 2026/06/11 12:02
     r'\d{1,2}月\d{1,2}日',                                   # 06月11日
     r'\d{1,2}:\d{2}',                                       # 12:02
+    r'(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}',  # July 28, 2026
+    r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4}',  # Jan 3, 2026 / Mar 3, 2026
 ]
 
 DATETIME_REGEX = re.compile('|'.join(DATETIME_PATTERNS), re.IGNORECASE)
@@ -80,7 +82,8 @@ COMBINED_DATE_REGEX = re.compile(
     r'(?P<iso>(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})T(\d{1,2}):(\d{2}):(\d{2})(?:\.\d+)?)'
     r'|(?P<num>(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?)?)'
     r'|(?P<cn>(\d{4})年(\d{1,2})月(\d{1,2})日(?:\s*(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?)?)'
-    r'|(?P<en>(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4})'
+    r'|(?P<en_full>(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4})'
+    r'|(?P<en>(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4})'
     r'|(?P<us>(\d{1,2})/(\d{1,2})/(\d{4}))'
 )
 
@@ -125,6 +128,25 @@ def _normalize_to_iso(date_str: str) -> str | None:
             y = date.today().year
             return f"{y}-{int(mo):02d}-{int(d):02d} {int(h):02d}:{int(mi):02d}:{int(sec):02d}"
         except ValueError:
+            pass
+    # 英文月份格式：July 28, 2026 或 Jan 3, 2026
+    m = re.match(r'(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})', s, re.IGNORECASE)
+    if m:
+        month_name, d, y = m.group(1), m.group(2), m.group(3)
+        try:
+            mo = {'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
+                  'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12}[month_name.lower()]
+            return f"{y}-{int(mo):02d}-{int(d):02d} 00:00:00"
+        except (ValueError, KeyError):
+            pass
+    m = re.match(r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})', s, re.IGNORECASE)
+    if m:
+        month_abbr, d, y = m.group(1), m.group(2), m.group(3)
+        try:
+            mo = {'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+                  'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12}[month_abbr.lower()]
+            return f"{y}-{int(mo):02d}-{int(d):02d} 00:00:00"
+        except (ValueError, KeyError):
             pass
     return None
 
