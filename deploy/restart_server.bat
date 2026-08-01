@@ -103,19 +103,33 @@ for /f %%A in ('type "%TEMP%\git_changes.txt" ^| find /c /v ""') do set "COUNT=%
 
 if "!COUNT!"=="0" (
     echo [INFO] No changes in backend/
+    del "%TEMP%\git_changes.txt" 2>nul
 ) else (
     echo [INFO] Found !COUNT! changed file(s):
     type "%TEMP%\git_changes.txt"
     echo.
-    for /f "delims=" %%F in ('type "%TEMP%\git_changes.txt"') do (
-        set "relpath=%%F"
-        set "relpath=!relpath:\=/!"
-        echo   !relpath! --^> !REMOTE_PATH!/!relpath!
-        scp -i "!SSH_KEY_ABS!" -P !SERVER_PORT! "!PROJECT_ROOT!\%%F" "!SERVER_USER!@!SERVER_IP!:/!REMOTE_PATH!/!relpath!"
-    )
-    echo [OK] Uploaded !COUNT! file(s)
+    goto :upload_retry
 )
+goto :after_upload
+
+:upload_retry
+set "UPLOAD_FAIL=0"
+for /f "delims=" %%F in ('type "%TEMP%\git_changes.txt"') do (
+    set "relpath=%%F"
+    set "relpath=!relpath:\=/!"
+    echo   !relpath! --^> !REMOTE_PATH!/!relpath!
+    scp -i "!SSH_KEY_ABS!" -P !SERVER_PORT! "!PROJECT_ROOT!\%%F" "!SERVER_USER!@!SERVER_IP!:/!REMOTE_PATH!/!relpath!"
+    if errorlevel 1 set "UPLOAD_FAIL=1"
+)
+if "!UPLOAD_FAIL!"=="1" (
+    echo [%TIME%] Upload failed, retrying in 2 minutes...
+    timeout /t 120 /nobreak >nul
+    goto :upload_retry
+)
+echo [OK] Uploaded !COUNT! file(s)
 del "%TEMP%\git_changes.txt" 2>nul
+
+:after_upload
 
 REM ================================================================
 REM Step 1: Stop old main.py
