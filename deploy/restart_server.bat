@@ -89,18 +89,47 @@ set "TODAY=%DATE:~0,4%-%DATE:~5,2%-%DATE:~8,2%"
 for /f "delims=" %%i in ('powershell -Command "Get-Date -Format 'yyyy-MM-dd'"') do set "TODAY=%%i"
 
 REM ================================================================
+REM Step 0: Upload git-changed files under backend/
+REM ================================================================
+echo.
+echo ================================================================
+echo   Step 0: Upload Changed Files
+echo ================================================================
+
+git -C "!PROJECT_ROOT!" diff --name-only -- backend/ > "%TEMP%\git_changes.txt"
+git -C "!PROJECT_ROOT!" ls-files --others --exclude-standard -- backend/ >> "%TEMP%\git_changes.txt"
+
+for /f %%A in ('type "%TEMP%\git_changes.txt" ^| find /c /v ""') do set "COUNT=%%A"
+
+if "!COUNT!"=="0" (
+    echo [INFO] No changes in backend/
+) else (
+    echo [INFO] Found !COUNT! changed file(s):
+    type "%TEMP%\git_changes.txt"
+    echo.
+    for /f "delims=" %%F in ('type "%TEMP%\git_changes.txt"') do (
+        set "relpath=%%F"
+        set "relpath=!relpath:\=/!"
+        echo   !relpath! --^> !REMOTE_PATH!/!relpath!
+        scp -i "!SSH_KEY_ABS!" -P !SERVER_PORT! "!PROJECT_ROOT!\%%F" "!SERVER_USER!@!SERVER_IP!:/!REMOTE_PATH!/!relpath!"
+    )
+    echo [OK] Uploaded !COUNT! file(s)
+)
+del "%TEMP%\git_changes.txt" 2>nul
+
+REM ================================================================
 REM Step 1: Stop old main.py
 REM ================================================================
 echo.
 echo ================================================================
-echo   Step 1: Stop Old Backend
+echo   Step 1: Stop Backend
 echo ================================================================
 !SSH_FULL! "pkill -9 -f 'uvicorn.*backend.main' 2>/dev/null || true; echo 'main.py stopped'"
 echo [OK] main.py stopped
 
 echo.
 echo ================================================================
-echo   Step 2: Start main.py
+echo   Step 2: Start Backend
 echo ================================================================
 start /b "" !SSH_FULL! "bash -c 'cd ''%REMOTE_PATH%'' && nohup python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 31234 > /dev/null 2>&1 &'"
 echo 启动成功
@@ -110,14 +139,14 @@ echo [OK] main.py started
 
 echo.
 echo ================================================================
-echo   Step 3: Stop old run_scheduler
+echo   Step 3: Stop Scheduler
 echo ================================================================
 !SSH_FULL! "pkill -9 -f 'run_scheduler' 2>/dev/null || true; echo 'run_scheduler stopped'"
 echo [OK] run_scheduler stopped
 
 echo.
 echo ================================================================
-echo   Step 4: Start run_scheduler
+echo   Step 4: Start Scheduler
 echo ================================================================
 start /b "" !SSH_FULL! "bash -c 'cd ''%REMOTE_PATH%'' && nohup python3 backend/run_scheduler.py >> ''%REMOTE_PATH%/logs/%TODAY%/scheduler.log'' 2>&1 &'"
 echo [OK] run_scheduler started

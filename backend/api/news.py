@@ -202,8 +202,10 @@ def get_news_all(request: Request):
         sorted_data = sorted(data, key=lambda x: x.get("importance_score", 0), reverse=True)[:limit]
         return {"data": sorted_data, "count": len(sorted_data)}
 
+    cfg = _load_news_cache_config()
+    latest_limit = cfg.get("latestNewsCount", 10)
     result = {
-        "latest": _top(latest_raw, 10),
+        "latest": _top(latest_raw, latest_limit),
         "hot":   _top(hot_raw, 10),
         "history": _top(history_raw, 50),
     }
@@ -435,8 +437,8 @@ def learn_news_source_async(request: Request, url: str, name: str = "", headline
     source_name = name or url
 
     def _run():
-        from script.bootstrap import set_news_type
-        set_news_type("AI新闻" if news_type == "ai" else "股市新闻")
+        from script.db.db_selector import ensure_db
+        ensure_db(news_type)
         try:
             learn_source_config(
                 url=url,
@@ -459,9 +461,9 @@ async def fetch_news_by_url(request: Request, url: str, limit: int = 10, news_ty
     复用 list_crawler 的提取逻辑，不入库。
     """
     from script.log import log as _log
-    from script.bootstrap import set_news_type
+    from script.db.db_selector import ensure_db
 
-    set_news_type("AI新闻" if news_type == "ai" else "股市新闻")
+    ensure_db(news_type)
 
     _log("fetch", f"[Fetch] 开始抓取: {url}, limit={limit}")
 
@@ -579,8 +581,8 @@ def fetch_news_async(request: Request, url: str, limit: int = 10, news_type: str
     from script.crawl.news_list.html_list import extract_article_links_with_dates
 
     def _run():
-        from script.bootstrap import set_news_type
-        set_news_type("AI新闻" if news_type == "ai" else "股市新闻")
+        from script.db.db_selector import ensure_db
+        ensure_db(news_type)
         try:
             src = get_crawl_config_by_url(url)
             if not src:

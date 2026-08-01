@@ -2,14 +2,15 @@
 db/connection.py - 数据库连接和初始化
 
 功能：
-  - 连接池管理（WAL 模式，5 连接）
+  - 多数据库连接池（按路径分池，ContextVar 切换后自动使用正确池）
   - 表结构初始化（CREATE TABLE IF NOT EXISTS）
   - 自动列迁移（检测缺失列并 ADD COLUMN，不丢数据）
   - 多余列检测（仅警告，不自动删，危险操作需手动确认）
 
 使用：
-  from script.db import get_conn, init_db
+  from script.db import get_conn, put_conn, init_db
   conn = get_conn()
+  put_conn(conn)
   init_db()  # 启动时自动调用
 """
 
@@ -28,26 +29,25 @@ def _get_schema_path() -> Path:
     return Path(__file__).resolve().parent / "schema.sql"
 
 _POOL_SIZE = 5
-_pool: Queue = None
+_pools: dict[str, Queue] = {}   # {db_path: connection_queue}
 _pool_lock = threading.Lock()
 
 
-def _init_pool() -> None:
-    """初始化连接池（惰性单例，线程安全）。"""
-    global _pool
-    if _pool is None:
-        with _pool_lock:
-            if _pool is None:
-                _pool = Queue(maxsize=_POOL_SIZE)
-                for _ in range(_POOL_SIZE):
-                    conn = sqlite3.connect(str(get_db_path()), check_same_thread=False)
-                    conn.execute("PRAGMA journal_mode=WAL")
-                    conn.execute("PRAGMA busy_timeout=30000")
-                    _pool.put(conn)
+def _get_pool(db_path: str) -> Queue:
+    """获取指定数据库路径的连接池（惰性创建，线程安全）。"""
+    with _pool_lock:
+        if db_path not in _pools:
+            _pools[db_path] = Queue(maxsize=_POOL_SIZE)
+            for _ in range(_POOL_SIZE):
+                conn = sqlite3.connect(db_path, check_same_thread=False)
+                conn.execute("PRAGMA journal_mode=WAL")
+                conn.execute("PRAGMA busy_timeout=30000")
+                _pools[db_path].put(conn)
+        return _pools[db_path]
 
 
 def get_conn() -> sqlite3.Connection:
-    """从连接池获取一个数据库连接。
+    """从当前数据库对应的池中获取一个连接（每次实时读 ContextVar）。
 
     Returns:
         sqlite3.Connection：已配置 WAL 模式的连接
@@ -55,12 +55,12 @@ def get_conn() -> sqlite3.Connection:
     Raises:
         sqlite3.Error：连接失败时
     """
-    if _pool is None:
-        _init_pool()
+    db_path = str(get_db_path())
+    pool = _get_pool(db_path)
     try:
-        conn = _pool.get(timeout=35)
+        conn = pool.get(timeout=35)
     except Empty:
-        conn = sqlite3.connect(str(get_db_path()))
+        conn = sqlite3.connect(db_path, check_same_thread=False)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=30000")
         return conn
@@ -68,22 +68,20 @@ def get_conn() -> sqlite3.Connection:
         conn.execute("SELECT 1")
         return conn
     except Exception:
-        conn = sqlite3.connect(str(get_db_path()))
+        conn = sqlite3.connect(db_path, check_same_thread=False)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=30000")
         return conn
 
 
 def put_conn(conn: sqlite3.Connection | None) -> None:
-    """归还连接到连接池。"""
-    global _pool
+    """将连接归还到对应数据库的池中。"""
     if conn is None:
         return
-    if _pool is None:
-        conn.close()
-        return
     try:
-        _pool.put_nowait(conn)
+        db_path = str(get_db_path())
+        pool = _get_pool(db_path)
+        pool.put_nowait(conn)
     except Exception:
         conn.close()
 

@@ -110,7 +110,7 @@ def _run_task_sync(task_id: str, handler: str, news_type: str = "股市新闻") 
     logger.info(f"[TASK_START] task_id={task_id}  handler={handler}")
     start = time.time()
     try:
-        cmd = _build_subprocess_cmd(handler)
+        cmd = _build_subprocess_cmd(handler, news_type)
         result = subprocess.run(
             cmd,
             capture_output=True,
