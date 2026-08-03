@@ -14,7 +14,8 @@ from datetime import date
 
 from script.log import log as _log
 from script.common.jsonutil import parse_json_field
-from script.common.datetimeutil import format_date_by_format, is_today
+from script.common.datetimeutil import format_date_by_format, is_today, is_within_days
+from script.bootstrap import is_ai_news_db
 
 
 def log(msg: str):
@@ -173,12 +174,13 @@ def _fetch_api_items_new_format(source: dict, target_date: date | None, list_con
 
 
 def _filter_today_items_new_format(all_items: list, list_config: dict, target_date: date) -> list:
-    """过滤当天 items（新格式，直接用 is_today）"""
+    """过滤当天 items（新格式，AI新闻支持3天范围）"""
     time_field = list_config.get("time_field", "publishedAt")
     date_format = list_config.get("date_format", "YYYY/MM/DD HH:mm")
+    days = 3 if is_ai_news_db() else 0
     return [
         it for it in all_items
-        if is_today(str(it.get("date", "")), today_date=target_date)
+        if is_within_days(str(it.get("date", "")), today_date=target_date, days=days)
     ]
 
 
@@ -227,9 +229,10 @@ def _fetch_api_items_old_format(source: dict, target_date: date | None, list_con
 
 
 def _filter_today_items_old_format(all_items: list, field_mapping: dict, list_config: dict, target_date: date) -> list:
+    days = 3 if is_ai_news_db() else 0
     return [
         it for it in all_items
-        if is_today(str(it.get("date", "")), today_date=target_date)
+        if is_within_days(str(it.get("date", "")), today_date=target_date, days=days)
     ]
 
 
@@ -387,15 +390,16 @@ def _inject_date_param(params: dict, list_config: dict, target_date: date) -> No
 
 
 def _filter_today_items(all_items: list, field_mapping: dict, list_config: dict, target_date: date) -> list:
-    """过滤当天的 items（与 date_format 解耦，依赖 is_today 自动归一化）。
+    """过滤当天的 items（AI新闻支持3天范围）。
 
     response item 里的日期字段可能是 "2026-06-18 07:04:00" / "20260618" / 时间戳等，
-    跟 API param 的 date_format 无关。用 is_today 做归一化判断最稳。
+    跟 API param 的 date_format 无关。用 is_within_days 做归一化判断最稳。
 
     注意：items 已经被 _extract_items_from_response 重映射过，日期固定在 'date' 键上，
     不需要再查 field_mapping（field_mapping 里的 date 字段存的是原始 API 字段名）。
     """
+    days = 3 if is_ai_news_db() else 0
     return [
         it for it in all_items
-        if is_today(str(it.get("date", "")), today_date=target_date)
+        if is_within_days(str(it.get("date", "")), today_date=target_date, days=days)
     ]

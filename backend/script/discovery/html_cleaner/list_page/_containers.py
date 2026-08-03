@@ -134,6 +134,15 @@ def _is_prunable_element(tag) -> bool:
     if chinese_count >= 10:
         return False
 
+    # 纯英文/其他字符：文本长度足够（>= 15 字符）认为是有意义文本
+    if len(text) >= 15:
+        return False
+
+    # <a> 标签自身是新闻链接（href 匹配 NEWS_URL_REGEX）→ 直接保留，不裁剪。
+    # 即使 own_text 很短或为空（如 <a href="/blog/kimi-k3"></a>），href 本身已足够。
+    if tag.name == 'a' and NEWS_URL_REGEX.search(tag.get('href', '')):
+        return False
+
     # 有有意义的子元素 → 保留
     for child in tag.children:
         if not hasattr(child, 'name') or child.name in ['\n', '\r', '\t']:

@@ -6,7 +6,7 @@ datetimeutil.py - 日期时间解析工具
 """
 
 import re
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 
 # =============================================================================
@@ -203,6 +203,24 @@ def is_today(publish_time_str: str | None, today_date: date | None = None) -> bo
     try:
         pub_date = datetime.strptime(date_part, "%Y-%m-%d").date()
         return pub_date == today_date
+    except (ValueError, TypeError):
+        return False
+
+
+def is_within_days(publish_time_str: str | None, today_date: date | None = None, days: int = 3) -> bool:
+    """判断日期是否在 [today - days, today] 范围内"""
+    if not publish_time_str:
+        return False
+    if today_date is None:
+        today_date = date.today()
+    normalized = _normalize_to_iso(publish_time_str)
+    if normalized:
+        date_part = normalized[:10]
+    else:
+        date_part = publish_time_str[:10]
+    try:
+        pub_date = datetime.strptime(date_part, "%Y-%m-%d").date()
+        return (today_date - timedelta(days=days)) <= pub_date <= today_date
     except (ValueError, TypeError):
         return False
 

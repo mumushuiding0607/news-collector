@@ -228,16 +228,28 @@ def _find_wrapper_in_container(a_tag: 'Tag', container: 'Tag', exclude: 'Tag | N
     return None
 
 
+# 结构型标签：自身很少是新闻项容器，但内部可能嵌套新闻块
+_STRUCTURAL_TAGS = {'header', 'main', 'footer', 'nav', 'aside'}
+
+
 def _get_sub_blocks(container: 'Tag') -> list:
     """
     找到 container 的直接子元素中，可以作为新闻项容器的元素。
     用于识别列表块内的子列表（如 div.headlines、div.focus 等）。
+
+    对于结构型标签（header/main/footer/nav/aside），会深入其内部查找新闻块容器，
+    以避免将导航链接误当作新闻内容保留。
     """
     sub_blocks = []
     for child in container.children:
         if not hasattr(child, 'name') or not child.name:
             continue
         if child.name not in ('div', 'li', 'tr', 'article', 'section', 'ul'):
+            # 对于结构型标签，深入内部查找新闻块
+            if child.name in _STRUCTURAL_TAGS:
+                nested = _get_sub_blocks(child)
+                if nested:
+                    sub_blocks.extend(nested)
             continue
         links = [a for a in child.find_all('a', href=True) if _is_news_link(a)]
         if links:

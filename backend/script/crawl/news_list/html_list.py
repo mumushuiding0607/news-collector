@@ -15,8 +15,9 @@ from bs4 import BeautifulSoup
 from script.log import log as _log
 from script.common.jsonutil import parse_json_field
 from script.discovery.html_cleaner import clean_boilerplate_text, clean_markdown_text
-from script.common.util import parse_publish_time, is_today
+from script.common.util import parse_publish_time, is_today, is_within_days
 from script.crawl.crawl_db import insert_article, upsert_list_page
+from script.bootstrap import is_ai_news_db
 from script.discovery.util.html_fetch import fetch_list_html
 
 # 静默 Crawl4AI 初始化日志（→ Crawl4AI x.x.x）
@@ -772,7 +773,8 @@ async def crawl_html_source(
             log(f"  -> {art['title'][:40]}... [NO-DATE] 已入库，news_filter 判断")
             continue
 
-        if not is_today(pub_time):
+        days = 3 if is_ai_news_db() else 0
+        if not is_within_days(pub_time, days=days):
             local_old += 1
             consecutive_not_today += 1
             log(f"  -> {art['title'][:40]}... [SKIP] 非当天 {pub_time}（连续 {consecutive_not_today}/{max_consec}）")
