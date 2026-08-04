@@ -154,15 +154,13 @@ def step4_discover_list(url: str, input_path: Path, output_dir: Path, name: str,
     return output_path
 
 
-def step5_crawl_article(article_url: str, output_dir: Path, name: str, wait_for: str | None = None) -> Path:
+def step5_crawl_article(article_url: str, output_dir: Path, name: str, wait_for: str | None = None, base_url: str = "") -> Path:
     """Step 5: crawl4ai 抓取文章页"""
     from urllib.parse import urljoin
-    from script.discovery.list_discovery import log as list_log
 
-    # 如果是相对 URL，转为绝对 URL
-    if article_url.startswith('/'):
-        # 从 list_dom_result 中获取 base URL
-        article_url = urljoin("https://news.smm.cn", article_url)
+    # 如果是相对 URL，转为绝对 URL（使用源站 base URL）
+    if article_url.startswith('/') and base_url:
+        article_url = urljoin(base_url, article_url)
 
     print(f"[Step 5] crawl4ai 抓取文章页: {article_url}")
     if wait_for:
@@ -422,7 +420,7 @@ def main():
         if start_step <= 5:
             if force_rerun or not step_paths[5].exists():
                 try:
-                    step_paths[5] = step5_crawl_article(article_url, TEST_DIR / "article_original", name, wait_for=article_wait)
+                    step_paths[5] = step5_crawl_article(article_url, TEST_DIR / "article_original", name, wait_for=article_wait, base_url=url)
                 except RuntimeError as e:
                     print(f"[ERROR] {e}，跳过")
                     continue
