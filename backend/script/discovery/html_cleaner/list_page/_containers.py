@@ -209,6 +209,72 @@ def _build_container_candidate(parent, link_count: int) -> tuple:
     return (-link_count, has_id, parent, container_str)
 
 
+def _extract_article_containers_fallback(soup: BeautifulSoup, seen: set) -> list[str]:
+    """
+    Fallback 提取策略：当页面没有匹配 NEWS_URL_REGEX 的链接时，
+    查找包含日期的 <article>、<section> 等结构化新闻容器。
+    用于 CSR 页面或非标准 URL 格式的新闻页面（如腾讯研究院）。
+    """
+    container_htmls = []
+    candidates = []
+
+    # 查找所有包含日期时间的 <article> 或 <section> 标签
+    for tag in soup.find_all(['article', 'section']):
+        text = tag.get_text(strip=True)
+        chinese_count = len(_CHINESE_RE.findall(text))
+        # 需要有实质性中文内容（>= 10 字）且包含日期
+        if chinese_count >= 10 and DATETIME_REGEX.search(text):
+            container_str = str(tag)
+            if container_str not in seen:
+                candidates.append((chinese_count, tag, container_str))
+
+    # 按中文内容丰富程度降序排列，优先保留内容最多的
+    candidates.sort(key=lambda x: -x[0])
+
+    for _, tag, container_str in candidates:
+        if container_str in seen:
+            continue
+        # 对容器内部进行剪枝
+        container_soup = BeautifulSoup(container_str, 'html.parser')
+        _prune_container(container_soup)
+        pruned_str = str(container_soup)
+        if len(pruned_str) > 100:  # 只保留有实质内容的容器
+            container_htmls.append(pruned_str)
+            seen.add(container_str)
+            # 标记所有后代字符串，防止重复
+            for d in _get_all_descendants_str(tag):
+                seen.add(d)
+
+    # 如果找到了结构化容器，直接返回
+    if container_htmls:
+        return container_htmls
+
+    # 最后尝试：查找包含日期的任意父容器（向上回溯）
+    for tag in soup.find_all(True):
+        if not hasattr(tag, 'name') or not tag.name:
+            continue
+        text = tag.get_text(strip=True)
+        chinese_count = len(_CHINESE_RE.findall(text))
+        if chinese_count >= 15 and DATETIME_REGEX.search(text):
+            # 向上找到合理的父容器
+            parent = tag.parent
+            depth = 0
+            while parent and depth < 5:
+                if parent.name in ('div', 'main', 'section', 'article', 'ul', 'ol'):
+                    container_str = str(parent)
+                    if container_str not in seen and len(container_str) > 200:
+                        container_soup = BeautifulSoup(container_str, 'html.parser')
+                        _prune_container(container_soup)
+                        pruned_str = str(container_soup)
+                        if len(pruned_str) > 100:
+                            container_htmls.append(pruned_str)
+                            seen.add(container_str)
+                parent = parent.parent
+                depth += 1
+
+    return container_htmls
+
+
 def extract_news_containers(html: str) -> list[str]:
     """
     用 BeautifulSoup 提取新闻列表区块 HTML。
@@ -238,6 +304,9 @@ def extract_news_containers(html: str) -> list[str]:
             a_tags.append(a_tag)
 
     if not a_tags:
+        # Fallback: 页面无匹配 NEWS_URL_REGEX 的链接，但可能有 <article> 等结构化新闻容器
+        # 例如腾讯研究院页面 (hy.tencent.com/research) 的文章链接不是标准 news URL 格式
+        container_htmls = _extract_article_containers_fallback(soup, seen)
         return container_htmls
 
     # Step 2: 找列表容器（包含多个新闻链接的容器）

@@ -20,6 +20,13 @@ _EMBEDDED_KEYWORDS = [
     "__NEXT_DATA__",
 ]
 
+# Tiptap 编辑器 JSON 关键字（Tiptap 是 Next.js 常用的富文本编辑器）
+# 注意：HTML 中的 JSON 使用转义引号，每个 \" 在字符串中实际是 \\\"
+# 所以查找 \\\"type\\\":\\\"link\\\" 在 Python 代码中要写成 \\\"type\\\":\\\"link\\\"
+_TIPTAP_KEYWORDS = [
+    '\\"type\\":\\"link\\"',
+]
+
 
 def find_embedded_json(html: str) -> dict | list | None:
     """
@@ -35,6 +42,11 @@ def find_embedded_json(html: str) -> dict | list | None:
     next_data = _extract_next_data(html)
     if next_data is not None:
         return next_data
+
+    # 尝试 Tiptap JSON 格式（Next.js 富文本编辑器）
+    tiptap_result = _extract_tiptap_json(html)
+    if tiptap_result is not None:
+        return tiptap_result
 
     for kw in _EMBEDDED_KEYWORDS:
         if kw in html:
@@ -172,6 +184,95 @@ def _extract_object(html: str, start: int) -> str | None:
         return None
 
     return html[first_open:end + 1]
+
+
+def _extract_tiptap_json(html: str) -> dict | list | None:
+    """
+    提取 Tiptap 编辑器格式的 JSON。
+
+    Tiptap JSON 格式：含有 "type":"link" 和 "fields":{"url":"..."} 结构。
+    智谱 AI 等网站使用 Tiptap 作为富文本编辑器，链接存储在这种格式中。
+
+    Returns:
+        解析后的 JSON 对象，或 None
+    """
+    for kw in _TIPTAP_KEYWORDS:
+        if kw not in html:
+            continue
+
+        idx = html.find(kw)
+        if idx == -1:
+            continue
+
+        # 向前查找 JSON 对象的开始（最近的 [ 或 {）
+        search_start = max(0, idx - 500)
+        segment = html[search_start:idx + 100]
+
+        # 尝试找到包含此 link 的数组或对象
+        # Tiptap 结构通常是 [..., {"type":"link", "fields":{...}}, ...]
+        # 向后扩展找到完整的 JSON 结构
+        start = idx
+        depth = 0
+        in_string = False
+        escape_next = False
+        found_start = -1
+
+        for i in range(idx, min(len(html), idx + 5000)):
+            c = html[i]
+
+            if escape_next:
+                escape_next = False
+                continue
+
+            if c == "\\":
+                escape_next = True
+                continue
+
+            if c == '"':
+                in_string = not in_string
+                continue
+
+            if in_string:
+                continue
+
+            if c in "{[(" and depth == 0:
+                found_start = i
+                depth = 1 if c in "{[" else 1
+            elif c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0 and found_start != -1:
+                    # 提取并解析
+                    json_str = html[found_start:i + 1]
+                    # 尝试 unescape 并解析
+                    try:
+                        # Tiptap JSON 可能含有转义引号，尝试 unescape
+                        unescaped = json_str.replace('\\"', '"')
+                        return json.loads(unescaped)
+                    except json.JSONDecodeError:
+                        pass
+                    # 尝试直接解析
+                    try:
+                        return json.loads(json_str)
+                    except json.JSONDecodeError:
+                        pass
+                    break
+
+        # 如果没找到完整结构，尝试向前查找
+        # 向后查找 JSON 块
+        search_segment = html[max(0, idx - 200):idx + 200]
+        # 查找 {"type":"link"
+        link_match = re.search(r'\{[^{}]*\"type\"[^{}]*\"link\"[^{}]*\}', search_segment)
+        if link_match:
+            json_str = link_match.group()
+            try:
+                unescaped = json_str.replace('\\"', '"')
+                return json.loads(unescaped)
+            except json.JSONDecodeError:
+                pass
+
+    return None
 
 
 def extract_news_items(

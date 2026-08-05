@@ -129,10 +129,20 @@ def _normalize_to_iso(date_str: str) -> str | None:
             return f"{y}-{int(mo):02d}-{int(d):02d} {int(h):02d}:{int(mi):02d}:{int(sec):02d}"
         except ValueError:
             pass
-    # 英文月份格式：July 28, 2026 或 Jan 3, 2026
+    # 英文月份格式：July 28, 2026 或 Jan 3, 2026（月份在前的格式）
     m = re.match(r'(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})', s, re.IGNORECASE)
     if m:
         month_name, d, y = m.group(1), m.group(2), m.group(3)
+        try:
+            mo = {'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
+                  'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12}[month_name.lower()]
+            return f"{y}-{int(mo):02d}-{int(d):02d} 00:00:00"
+        except (ValueError, KeyError):
+            pass
+    # 英文月份格式：28 July 2026（日期在前的格式）
+    m = re.match(r'(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})', s, re.IGNORECASE)
+    if m:
+        d, month_name, y = m.group(1), m.group(2), m.group(3)
         try:
             mo = {'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
                   'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12}[month_name.lower()]

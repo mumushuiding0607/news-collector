@@ -19,6 +19,8 @@ from ._content import discover_content_with_policy
 from ._existing import load_existing_config
 from ._list import apply_list_complete, discover_list_with_policy, fetch_list_html
 from ._save import build_result, save_learned_config
+from script.discovery.html_cleaner import clean_html
+from script.discovery.util.news_block_truncator import truncate_html_by_news_items
 
 __all__ = ["learn_source_config"]
 
@@ -58,16 +60,25 @@ def learn_source_config(
     if not list_html:
         return {}
 
+    # Step 1.1.5: 与 test_learn_flow.py 对齐，先清洗再截断
+    cleaned = clean_html(list_html)
+    cleaned_html = cleaned.html
+    log(f"[统一学习] HTML 清洗完成，移除 {cleaned.removed_count} 个标签")
+    truncated_html = truncate_html_by_news_items(cleaned_html, max_size=200*1024)
+    log(f"[统一学习] HTML 截断后长度: {len(truncated_html)}")
+
     # Step 1.2/2
     list_config, saved_source_type, discovery_method = discover_list_with_policy(
-        url, list_html, existing_list_config, headline, force_relearn,
+        url, truncated_html, existing_list_config, headline, force_relearn,
     )
 
     # Step 2.1
     list_config = apply_list_complete(list_config, skip_article_crawler)
 
     # Step 3
-    article_url, article_title, sample_news = extract_sample_article(list_config, list_html, name)
+    article_url, article_title, sample_news = extract_sample_article(
+        list_config, truncated_html, name, base_url=url,
+    )
 
     # Step 4
     content_config = discover_content_with_policy(

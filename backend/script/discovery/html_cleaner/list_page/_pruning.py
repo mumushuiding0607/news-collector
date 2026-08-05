@@ -114,6 +114,14 @@ def _is_useless_element(tag) -> bool:
     if tag.name == 'a' and NEWS_URL_REGEX.search(tag.get('href', '')):
         return False
 
+    # 结构化标签（article/section/div）且自身文本含日期 + 中文字符数 >= 3 → 保留
+    # （CSR 页面文章可能不在 <a> 标签内，但仍应保留）
+    if tag.name in ('article', 'section', 'div'):
+        own_text = tag.get_text(strip=True, separator='')
+        chinese_count = _count_chinese(own_text)
+        if chinese_count >= 3 and DATETIME_REGEX.search(own_text):
+            return False
+
     # 检查是否有有意义的子元素
     for child in tag.children:
         if child.name is None or child.name in ['\n', '\r', '\t']:

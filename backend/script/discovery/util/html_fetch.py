@@ -98,6 +98,7 @@ async def fetch_rendered_html(
     return_markdown: bool = False,
     crawler: AsyncWebCrawler | None = None,
     delay_before_return_html: float | None = None,
+    js_code: str | None = None,
     log_fn=None,
 ) -> tuple[str, str] | tuple[str, str, str]:
     """
@@ -136,6 +137,8 @@ async def fetch_rendered_html(
         run_config_kwargs["wait_for"] = wait_for
     if delay_before_return_html is not None:
         run_config_kwargs["delay_before_return_html"] = delay_before_return_html
+    if js_code:
+        run_config_kwargs["js_code"] = js_code
 
     async def _do_fetch(c: AsyncWebCrawler):
         result = await c.arun(url=url, config=CrawlerRunConfig(**run_config_kwargs))

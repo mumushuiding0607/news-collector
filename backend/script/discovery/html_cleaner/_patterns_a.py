@@ -37,6 +37,7 @@ NEWS_URL_PATTERNS = [
     r'/\d+/\d+/\d+\.htm',  # /1/850/850982.htm 或 /1/1129/1129586.htm 格式
     r'/themeDetails/\d+',  # 华创证券等券商平台文章详情页
     r'/blog/[a-zA-Z0-9]+[-][a-zA-Z0-9]+',  # /blog/kimi-k3、/blog/perception-bench 等研究博客
+    r'/zh/research/\d+',  # 智谱 AI 研究页面 /zh/research/153
     r'github\.com/MoonshotAI/',  # GitHub 研究仓库
     r'github\.com/kvcache-ai/',  # Mooncake 等研究仓库
     r'huggingface\.co/moonshotai/',  # HuggingFace 模型页
