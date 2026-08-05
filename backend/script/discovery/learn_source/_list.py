@@ -3,16 +3,20 @@ import asyncio
 from urllib.parse import urlencode, urlparse
 
 from script.discovery.list_discovery import discover_list_config, log
-from script.discovery.util.html_fetch import fetch_list_html as _fetch_list_html_async
+from script.discovery.util.html_fetch import fetch_rendered_html
 
 # 已确认失效的列表配置类型：保留只会浪费尝试，必须重新学习
 OBSOLETE_LIST_TYPES = ("ajax", "api", "column", "cctv")
 
 
 def fetch_list_html(url: str) -> str:
-    """Step 1.1: 抓取列表页（统一走 fetch_list_html 入口，自动等待 JS 渲染）"""
-    log(f"[Step 1.1] 抓取列表页: {url}")
-    _, list_html = asyncio.run(_fetch_list_html_async(url))
+    """Step 1.1: 抓取列表页（统一走 fetch_rendered_html 入口，自动等待 JS 渲染）
+
+    与 test_learn_flow.py 保持一致：使用 delay_before_return_html=1.5
+    """
+    from script.discovery.util.html_fetch import DEFAULT_LIST_DELAY_SECONDS
+    log(f"[Step 1.1] 抓取列表页: {url}, delay={DEFAULT_LIST_DELAY_SECONDS}s")
+    _, list_html = asyncio.run(fetch_rendered_html(url, delay_before_return_html=DEFAULT_LIST_DELAY_SECONDS))
     if not list_html:
         log(f"[Step 1.1] 列表页抓取失败: {url}")
         return ""

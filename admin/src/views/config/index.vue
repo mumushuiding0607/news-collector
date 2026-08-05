@@ -26,9 +26,29 @@ const envForm = ref({
   SMTP_USER: "",
 });
 
-const sourcesForm = ref({
+const aiNewsForm = ref({
   crawNumPerSource: 30,
   maxConsecutiveNonToday: 10,
+  maxArticlesPerSource: 500,
+  maxSourceConcurrency: 5,
+  htmlFallbackArticles: 50,
+  skipIfNoDate: false,
+  titleMinLength: 10,
+  days: 30,
+});
+
+const stockNewsForm = ref({
+  crawNumPerSource: 30,
+  maxConsecutiveNonToday: 10,
+  maxArticlesPerSource: 500,
+  maxSourceConcurrency: 5,
+  htmlFallbackArticles: 50,
+  skipIfNoDate: false,
+  titleMinLength: 10,
+  days: 0,
+});
+
+const sourcesForm = ref({
   llmBatchSize: 20,
   llmTimeout: 120,
   llmMaxRetries: 3,
@@ -77,9 +97,34 @@ async function fetchConfig() {
       };
     }
     if (sourcesData) {
+      // AI新闻配置
+      const aiNews = (sourcesData["AI新闻"] as Record<string, unknown>) || {};
+      aiNewsForm.value = {
+        crawNumPerSource: (aiNews["crawNumPerSource"] as number) ?? 30,
+        maxConsecutiveNonToday: (aiNews["maxConsecutiveNonToday"] as number) ?? 10,
+        maxArticlesPerSource: (aiNews["maxArticlesPerSource"] as number) ?? 500,
+        maxSourceConcurrency: (aiNews["maxSourceConcurrency"] as number) ?? 5,
+        htmlFallbackArticles: (aiNews["htmlFallbackArticles"] as number) ?? 50,
+        skipIfNoDate: Boolean(aiNews["skipIfNoDate"]),
+        titleMinLength: (aiNews["titleMinLength"] as number) ?? 10,
+        days: (aiNews["days"] as number) ?? 30,
+      };
+
+      // 股市新闻配置
+      const stockNews = (sourcesData["股市新闻"] as Record<string, unknown>) || {};
+      stockNewsForm.value = {
+        crawNumPerSource: (stockNews["crawNumPerSource"] as number) ?? 30,
+        maxConsecutiveNonToday: (stockNews["maxConsecutiveNonToday"] as number) ?? 10,
+        maxArticlesPerSource: (stockNews["maxArticlesPerSource"] as number) ?? 500,
+        maxSourceConcurrency: (stockNews["maxSourceConcurrency"] as number) ?? 5,
+        htmlFallbackArticles: (stockNews["htmlFallbackArticles"] as number) ?? 50,
+        skipIfNoDate: Boolean(stockNews["skipIfNoDate"]),
+        titleMinLength: (stockNews["titleMinLength"] as number) ?? 10,
+        days: (stockNews["days"] as number) ?? 0,
+      };
+
+      // 全局配置
       sourcesForm.value = {
-        crawNumPerSource: (sourcesData["crawNumPerSource"] as number) ?? 30,
-        maxConsecutiveNonToday: (sourcesData["maxConsecutiveNonToday"] as number) ?? 10,
         llmBatchSize: (sourcesData["llmBatchSize"] as number) ?? 20,
         llmTimeout: (sourcesData["llmTimeout"] as number) ?? 120,
         llmMaxRetries: (sourcesData["llmMaxRetries"] as number) ?? 3,
@@ -140,7 +185,12 @@ async function handleSaveEnv() {
 async function handleSaveSources() {
   saving.value = true;
   try {
-    await updateSourcesConfig(sourcesForm.value);
+    const payload = {
+      "AI新闻": { ...aiNewsForm.value },
+      "股市新闻": { ...stockNewsForm.value },
+      ...sourcesForm.value,
+    };
+    await updateSourcesConfig(payload);
     alert("Sources 配置保存成功");
   } catch (e) {
     console.error(e);
@@ -220,50 +270,167 @@ onMounted(fetchConfig);
 
       <el-tab-pane label="Sources 配置" name="sources">
         <el-card style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px">
-          <el-form :model="sourcesForm" label-width="160px" style="max-width: 700px">
-            <el-divider content-position="left">采集参数</el-divider>
-            <el-form-item label="每源采集数量">
-              <el-input-number v-model="sourcesForm.crawNumPerSource" :min="1" :max="1000" />
-            </el-form-item>
-            <el-form-item label="最大连续非当日数">
-              <el-input-number v-model="sourcesForm.maxConsecutiveNonToday" :min="1" :max="100" />
-            </el-form-item>
+          <el-form :model="sourcesForm" label-width="160px" style="max-width: 800px">
+
+            <el-divider content-position="left">AI新闻采集参数</el-divider>
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="每源采集数量">
+                  <el-input-number v-model="aiNewsForm.crawNumPerSource" :min="1" :max="1000" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="最大连续非当日数">
+                  <el-input-number v-model="aiNewsForm.maxConsecutiveNonToday" :min="1" :max="100" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="每源硬上限">
+                  <el-input-number v-model="aiNewsForm.maxArticlesPerSource" :min="1" :max="1000" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="跨源并发数">
+                  <el-input-number v-model="aiNewsForm.maxSourceConcurrency" :min="1" :max="20" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="HTML Fallback文章数">
+                  <el-input-number v-model="aiNewsForm.htmlFallbackArticles" :min="1" :max="200" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="标题最短长度">
+                  <el-input-number v-model="aiNewsForm.titleMinLength" :min="1" :max="50" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="日期范围（天）">
+                  <el-input-number v-model="aiNewsForm.days" :min="0" :max="365" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="无日期时跳过">
+                  <el-switch v-model="aiNewsForm.skipIfNoDate" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-divider content-position="left">股市新闻采集参数</el-divider>
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="每源采集数量">
+                  <el-input-number v-model="stockNewsForm.crawNumPerSource" :min="1" :max="1000" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="最大连续非当日数">
+                  <el-input-number v-model="stockNewsForm.maxConsecutiveNonToday" :min="1" :max="100" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="每源硬上限">
+                  <el-input-number v-model="stockNewsForm.maxArticlesPerSource" :min="1" :max="1000" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="跨源并发数">
+                  <el-input-number v-model="stockNewsForm.maxSourceConcurrency" :min="1" :max="20" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="HTML Fallback文章数">
+                  <el-input-number v-model="stockNewsForm.htmlFallbackArticles" :min="1" :max="200" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="标题最短长度">
+                  <el-input-number v-model="stockNewsForm.titleMinLength" :min="1" :max="50" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="日期范围（天）">
+                  <el-input-number v-model="stockNewsForm.days" :min="0" :max="365" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="无日期时跳过">
+                  <el-switch v-model="stockNewsForm.skipIfNoDate" />
+                </el-form-item>
+              </el-col>
+            </el-row>
 
             <el-divider content-position="left">LLM 参数</el-divider>
-            <el-form-item label="LLM 批次大小">
-              <el-input-number v-model="sourcesForm.llmBatchSize" :min="1" :max="200" />
-            </el-form-item>
-            <el-form-item label="LLM 超时（秒）">
-              <el-input-number v-model="sourcesForm.llmTimeout" :min="10" :max="600" />
-            </el-form-item>
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="LLM 批次大小">
+                  <el-input-number v-model="sourcesForm.llmBatchSize" :min="1" :max="200" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="LLM 超时（秒）">
+                  <el-input-number v-model="sourcesForm.llmTimeout" :min="10" :max="600" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
             <el-form-item label="LLM 最大重试">
               <el-input-number v-model="sourcesForm.llmMaxRetries" :min="0" :max="10" />
             </el-form-item>
 
             <el-divider content-position="left">超时配置</el-divider>
-            <el-form-item label="新闻过滤超时（秒）">
-              <el-input-number v-model="sourcesForm.newsFilterTimeout" :min="5" :max="300" />
-            </el-form-item>
-            <el-form-item label="评分超时（秒）">
-              <el-input-number v-model="sourcesForm.scorerTimeout" :min="5" :max="300" />
-            </el-form-item>
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="新闻过滤超时（秒）">
+                  <el-input-number v-model="sourcesForm.newsFilterTimeout" :min="5" :max="300" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="评分超时（秒）">
+                  <el-input-number v-model="sourcesForm.scorerTimeout" :min="5" :max="300" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
             <el-form-item label="找股票超时（秒）">
-              <el-input-number v-model="sourcesForm.findStocksTimeout" :min="5" :max="300" />
+              <el-input-number v-model="sourcesForm.findStocksTimeout" :min="5" :max="300" style="width: 100%" />
             </el-form-item>
 
             <el-divider content-position="left">缓存配置</el-divider>
-            <el-form-item label="最低分数">
-              <el-input-number v-model="sourcesForm.newsCache.minScore" :min="0" :max="100" />
-            </el-form-item>
-            <el-form-item label="热点新闻最低分">
-              <el-input-number v-model="sourcesForm.newsCache.hotNewsMinScore" :min="0" :max="100" />
-            </el-form-item>
-            <el-form-item label="历史天数">
-              <el-input-number v-model="sourcesForm.newsCache.historyDays" :min="1" :max="30" />
-            </el-form-item>
-            <el-form-item label="最新新闻显示数量">
-              <el-input-number v-model="sourcesForm.newsCache.latestNewsCount" :min="1" :max="100" />
-            </el-form-item>
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="最低分数">
+                  <el-input-number v-model="sourcesForm.newsCache.minScore" :min="0" :max="100" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="热点新闻最低分">
+                  <el-input-number v-model="sourcesForm.newsCache.hotNewsMinScore" :min="0" :max="100" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="历史天数">
+                  <el-input-number v-model="sourcesForm.newsCache.historyDays" :min="1" :max="30" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="最新新闻显示数量">
+                  <el-input-number v-model="sourcesForm.newsCache.latestNewsCount" :min="1" :max="100" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
 
             <el-form-item>
               <el-button type="primary" :loading="saving" @click="handleSaveSources">保存配置</el-button>

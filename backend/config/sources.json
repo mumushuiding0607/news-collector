@@ -1,7 +1,25 @@
 {
-  "crawNumPerSource": 30,
-  "maxConsecutiveNonToday": 10,
-  "llmBatchSize": 20,
+  "AI新闻": {
+    "crawNumPerSource": 30,
+    "maxConsecutiveNonToday": 10,
+    "maxArticlesPerSource": 30,
+    "maxSourceConcurrency": 5,
+    "htmlFallbackArticles": 50,
+    "skipIfNoDate": false,
+    "titleMinLength": 4,
+    "days": 7
+  },
+  "股市新闻": {
+    "crawNumPerSource": 30,
+    "maxConsecutiveNonToday": 10,
+    "maxArticlesPerSource": 30,
+    "maxSourceConcurrency": 5,
+    "htmlFallbackArticles": 50,
+    "skipIfNoDate": false,
+    "titleMinLength": 10,
+    "days": 0
+  },
+  "llmBatchSize": 10,
   "llmTimeout": 120,
   "llmMaxRetries": 3,
   "newsFilterTimeout": 40,

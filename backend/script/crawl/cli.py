@@ -115,7 +115,7 @@ def _run_single_source_mode(target_url: str) -> None:
         result = asyncio.run(crawl_raw_source(source, batch_id, today, existing_urls))
         print(f"结果: 当天入库 {result.get('today', 0)}, 非当天 {result.get('old', 0)}")
     else:
-        result = asyncio.run(crawl_html_source(source, batch_id, global_limit, global_max_consecutive, existing_urls))
+        result = asyncio.run(crawl_html_source(source, batch_id, global_limit, global_max_consecutive, existing_urls, cfg))
         if result:
             print(f"结果: 当天入库 {result['today']}, 非当天 {result['old']}")
         else:

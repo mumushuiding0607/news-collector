@@ -7,6 +7,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from script.bootstrap import is_ai_news_db
+
 # 正确路径：config/ 在 backend/ 下，与 bootstrap 的 APP_ROOT / "config" 不同
 _SOURCES_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "sources.json"
 _sources_data: dict | None = None
@@ -21,13 +23,23 @@ def _load() -> dict:
 
 
 def get_crawl_config() -> dict:
-    """返回爬虫相关配置：crawNumPerSource, maxConsecutiveNonToday"""
+    """返回爬虫相关配置，根据当前新闻类型返回对应配置"""
     global _cached_config
     if _cached_config is None:
         data = _load()
+        news_type = "AI新闻" if is_ai_news_db() else "股市新闻"
+        type_config = data.get(news_type, {})
+
         _cached_config = {
-            "crawNumPerSource": data.get("crawNumPerSource"),
-            "maxConsecutiveNonToday": data.get("maxConsecutiveNonToday", 10),
+            "crawNumPerSource": type_config.get("crawNumPerSource", 30),
+            "maxConsecutiveNonToday": type_config.get("maxConsecutiveNonToday", 10),
+            "maxArticlesPerSource": type_config.get("maxArticlesPerSource", 500),
+            "maxSourceConcurrency": type_config.get("maxSourceConcurrency", 5),
+            "htmlFallbackArticles": type_config.get("htmlFallbackArticles", 50),
+            "skipIfNoDate": type_config.get("skipIfNoDate", False),
+            "titleMinLength": type_config.get("titleMinLength", 10),
+            "days": type_config.get("days", 0),
+            # LLM 相关配置保持全局
             "llmBatchSize": data.get("llmBatchSize", 20),
             "llmTimeout": data.get("llmTimeout", 120),
             "llmMaxRetries": data.get("llmMaxRetries", 3),

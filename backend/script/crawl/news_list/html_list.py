@@ -27,7 +27,6 @@ for _logger_name in ["crawl4ai", "Crawl4AI"]:
 
 # 常量
 MAX_SUBTITLE_LEN = 300
-MAX_ARTICLES_PER_SOURCE = 500  # 每源硬上限，防止意外循环
 
 
 # 纯时间格式（HH:MM / HH:MM:SS）→ 今天日期 + 该时间
@@ -318,7 +317,7 @@ def _build_selector_from_reverse(list_config: dict) -> dict:
     }
 
 
-def extract_with_css_selectors(html: str, source_name: str, list_config: dict, base_url: str = "") -> list[dict]:
+def extract_with_css_selectors(html: str, source_name: str, list_config: dict, title_min_len: int, base_url: str = "") -> list[dict]:
     """使用 list_config 中的 CSS 选择器从列表页 HTML提取文章"""
     selector_cfg = list_config.get("selector", {})
     if not selector_cfg:
@@ -461,7 +460,7 @@ def extract_with_css_selectors(html: str, source_name: str, list_config: dict, b
             title_text = re.sub(title_date_pat, '', title_text).strip()
         title_text = re.sub(r'\s+', ' ', title_text).strip()
 
-        if len(title_text) <= 2:
+        if len(title_text) < title_min_len:
             continue
 
         summary = ""
@@ -508,7 +507,7 @@ def extract_with_css_selectors(html: str, source_name: str, list_config: dict, b
     return articles
 
 
-def extract_list_articles(html: str, markdown: str, source_name: str, list_config: dict | None, base_url: str = "") -> list[dict]:
+def extract_list_articles(html: str, markdown: str, source_name: str, list_config: dict | None, title_min_len: int, base_url: str = "") -> list[dict]:
     """提取列表页文章，不入库。返回 [{"title": "", "url": "", "time": "", "summary": ""}, ...]"""
     if not html and not markdown:
         return []
@@ -520,7 +519,7 @@ def extract_list_articles(html: str, markdown: str, source_name: str, list_confi
     css_articles = []
     use_css_selector = False
     if config_type == "html" and list_config.get("selector"):
-        css_articles = extract_with_css_selectors(html, source_name, list_config, base_url)
+        css_articles = extract_with_css_selectors(html, source_name, list_config, title_min_len, base_url)
         if css_articles:
             use_css_selector = True
 
@@ -674,6 +673,7 @@ async def crawl_html_source(
     global_limit: int,
     global_max_consecutive: int,
     existing_urls: set,
+    cfg: dict,
     target_date=None,
     crawler: "AsyncWebCrawler | None" = None,
 ) -> dict:
@@ -691,6 +691,9 @@ async def crawl_html_source(
     # 新配置规则：list_complete=True 表示列表页已含完整信息，
     # 入库时把 summary 写入 content，下游 article_crawler 会自动跳过抓取
     list_complete = bool(list_config.get("list_complete", False)) if isinstance(list_config, dict) else False
+
+    title_min_len = cfg.get("titleMinLength", 10)
+    max_articles_per_source = cfg.get("maxArticlesPerSource", 500)
 
     log(f"\n-> Phase1 [List] {name}: {list_url}")
 
@@ -710,7 +713,7 @@ async def crawl_html_source(
         return None
 
     # 与 /api/news/fetch 完全相同的提取入口（CSS → markdown 补 URL → HTML fallback 三级兜底）
-    articles = extract_list_articles(html or "", markdown or "", name, list_config or {}, list_url)
+    articles = extract_list_articles(html or "", markdown or "", name, list_config or {}, title_min_len, list_url)
     log(f"  [P1] 提取到 {len(articles)} 个文章链接")
 
     # 是否走 CSS 选择器模式（用于决定后续入库路径：upsert_list_page vs insert_article）
@@ -733,16 +736,15 @@ async def crawl_html_source(
     no_date_sources = {}
 
     for art in new_articles:
-        if local_processed >= MAX_ARTICLES_PER_SOURCE:
-            log(f"  [P1] 已达硬上限 {MAX_ARTICLES_PER_SOURCE}，停止该源")
+        if local_processed >= max_articles_per_source:
+            log(f"  [P1] 已达硬上限 {max_articles_per_source}，停止该源")
             break
         if craw_limit and craw_limit > 0 and local_processed >= craw_limit:
             log(f"  [P1] 已达每源采集上限 {craw_limit}，停止该源")
             break
         local_processed += 1
 
-        # 标题少于10个字不存储，但日志正常输出
-        if len(art.get("title", "")) < 10:
+        if len(art.get("title", "")) < title_min_len:
             log(f"  -> {art['title'][:40]}... [SKIP] 标题过短（{len(art.get('title', ''))}字）")
             continue
 
@@ -773,7 +775,7 @@ async def crawl_html_source(
             log(f"  -> {art['title'][:40]}... [NO-DATE] 已入库，news_filter 判断")
             continue
 
-        days = 3 if is_ai_news_db() else 0
+        days = cfg["days"]
         if not is_within_days(pub_time, days=days):
             local_old += 1
             consecutive_not_today += 1

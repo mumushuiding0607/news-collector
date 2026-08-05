@@ -43,7 +43,7 @@ def fetch_api_page(endpoint: str, params: dict, page: int = 1) -> dict:
         return {}
 
 
-def crawl_api_source(source: dict, batch_id: int, target_date: date | None = None) -> dict:
+def crawl_api_source(source: dict, batch_id: int, target_date: date | None = None, cfg: dict | None = None) -> dict:
     """根据 list_config 采集 API 数据源"""
     name = source.get("name", source.get("config_name", "未知数据源"))
     list_config_str = source.get("list_config")
@@ -160,7 +160,8 @@ def _fetch_api_items_new_format(source: dict, target_date: date | None, list_con
         page += 1
 
     # 过滤当天
-    today_items = _filter_today_items_new_format(all_items, list_config, target_date)
+    days = cfg.get("days", 3) if cfg else (3 if is_ai_news_db() else 0)
+    today_items = _filter_today_items_new_format(all_items, list_config, target_date, days)
     return [
         {
             "title": it.get("title", ""),
@@ -173,11 +174,10 @@ def _fetch_api_items_new_format(source: dict, target_date: date | None, list_con
     ]
 
 
-def _filter_today_items_new_format(all_items: list, list_config: dict, target_date: date) -> list:
+def _filter_today_items_new_format(all_items: list, list_config: dict, target_date: date, days: int) -> list:
     """过滤当天 items（新格式，AI新闻支持3天范围）"""
     time_field = list_config.get("time_field", "publishedAt")
     date_format = list_config.get("date_format", "YYYY/MM/DD HH:mm")
-    days = 3 if is_ai_news_db() else 0
     return [
         it for it in all_items
         if is_within_days(str(it.get("date", "")), today_date=target_date, days=days)
@@ -215,7 +215,8 @@ def _fetch_api_items_old_format(source: dict, target_date: date | None, list_con
         all_items.extend(items)
         page += 1
 
-    today_items = _filter_today_items_old_format(all_items, field_mapping, list_config, target_date)
+    days = cfg.get("days", 3) if cfg else (3 if is_ai_news_db() else 0)
+    today_items = _filter_today_items_old_format(all_items, field_mapping, list_config, target_date, days)
     return [
         {
             "title": it.get("title", ""),
@@ -228,8 +229,7 @@ def _fetch_api_items_old_format(source: dict, target_date: date | None, list_con
     ]
 
 
-def _filter_today_items_old_format(all_items: list, field_mapping: dict, list_config: dict, target_date: date) -> list:
-    days = 3 if is_ai_news_db() else 0
+def _filter_today_items_old_format(all_items: list, field_mapping: dict, list_config: dict, target_date: date, days: int) -> list:
     return [
         it for it in all_items
         if is_within_days(str(it.get("date", "")), today_date=target_date, days=days)
@@ -295,7 +295,8 @@ def _crawl_generic_api(source: dict, batch_id: int, target_date: date | None, li
     log(f"  获取到 {len(all_items)} 条数据")
 
     # 过滤当天数据（按 date_format 决定比较方式）
-    today_items = _filter_today_items(all_items, field_mapping, list_config, target_date)
+    days = cfg.get("days", 3) if cfg else (3 if is_ai_news_db() else 0)
+    today_items = _filter_today_items(all_items, field_mapping, list_config, target_date, days)
     log(f"  当天 {len(today_items)} 条")
 
     # 批量入库
@@ -389,7 +390,7 @@ def _inject_date_param(params: dict, list_config: dict, target_date: date) -> No
                 break
 
 
-def _filter_today_items(all_items: list, field_mapping: dict, list_config: dict, target_date: date) -> list:
+def _filter_today_items(all_items: list, field_mapping: dict, list_config: dict, target_date: date, days: int) -> list:
     """过滤当天的 items（AI新闻支持3天范围）。
 
     response item 里的日期字段可能是 "2026-06-18 07:04:00" / "20260618" / 时间戳等，
@@ -398,7 +399,6 @@ def _filter_today_items(all_items: list, field_mapping: dict, list_config: dict,
     注意：items 已经被 _extract_items_from_response 重映射过，日期固定在 'date' 键上，
     不需要再查 field_mapping（field_mapping 里的 date 字段存的是原始 API 字段名）。
     """
-    days = 3 if is_ai_news_db() else 0
     return [
         it for it in all_items
         if is_within_days(str(it.get("date", "")), today_date=target_date, days=days)

@@ -542,7 +542,9 @@ async def fetch_news_by_url(request: Request, url: str, limit: int = 10, news_ty
 
         name = src.get("name") or url
         _log("fetch", f"[Fetch] HTML提取配置: {list_config.get('type')}, list_complete={list_config.get('list_complete')}")
-        news_items = extract_list_articles(html, markdown, name, list_config, url)
+        from script.crawl.crawl_config import get_crawl_config
+        title_min_len = get_crawl_config().get("titleMinLength", 10)
+        news_items = extract_list_articles(html, markdown, name, list_config, title_min_len, url)
         _log("fetch", f"[Fetch] HTML解析获取 {len(news_items)} 条")
 
     if not news_items:

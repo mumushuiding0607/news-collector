@@ -222,30 +222,29 @@ async def process_batch_llm(
     return [(news["id"], {"will_flunctuate": False}) for news in news_batch], "兜底：未知路径"
 
 
-def pre_filter_news(news_list: list[dict], conn) -> tuple[list[dict], int]:
+def pre_filter_news(news_list: list[dict], conn, title_min_len: int) -> tuple[list[dict], int]:
     """
     预过滤：标题过短的新闻直接标记为无用，不送 LLM。
 
-    规则：标题少于 12 字的直接过滤。理由：
+    规则：标题少于指定字数的直接过滤。理由：
     - 标题信息密度过低，LLM 难以判断是否影响市场（容易误判）
     - 短标题多为导视/标题党/截断内容（如"短""早安""今日""继续关注"等）
     - 相比关键词规则（央视/体育/娱乐），字数过滤对所有来源中立，避免针对特定信源
 
     返回：(过滤后待处理列表, 预过滤数量)
     """
-    MIN_TITLE_LEN = 12
     pre_filtered_count = 0
 
     for news in news_list:
         title = news["title"]
-        if len(title) < MIN_TITLE_LEN:
+        if len(title) < title_min_len:
             mark_useful(news["id"], useful=-1, commit=False, conn=conn)
             pre_filtered_count += 1
 
     if pre_filtered_count:
         conn.commit()
 
-    filtered = [n for n in news_list if len(n["title"]) >= MIN_TITLE_LEN]
+    filtered = [n for n in news_list if len(n["title"]) >= title_min_len]
     return filtered, pre_filtered_count
 
 
@@ -282,7 +281,7 @@ async def main():
 
     # 预过滤：明显的"无用"直接标记，不送 LLM（节省 ~15-25% 调用）
     # 规则保守：宁可漏判给 LLM，不要误杀
-    news_list, pre_filtered_count = pre_filter_news(news_list, conn)
+    news_list, pre_filtered_count = pre_filter_news(news_list, conn, cfg.get("titleMinLength", 10))
     if pre_filtered_count:
         log(f"预过滤标记 {pre_filtered_count} 条明显无用（不送 LLM）")
 

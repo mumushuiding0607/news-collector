@@ -34,9 +34,7 @@ def log(msg: str):
     _log("list_crawler", msg)
 
 
-# 跨源并发上限：避免一次开太多浏览器 tab 导致内存炸/反爬警觉
-# 同一源内部仍串行（由 html_list.crawl_html_source 的实现保证）
-MAX_SOURCE_CONCURRENCY = 5
+# 跨源并发上限：从 config 读取，避免一次开太多浏览器 tab 导致内存炸/反爬警觉
 
 
 today = date.today()
@@ -51,6 +49,7 @@ async def main():
     cfg = get_crawl_config()
     global_limit = cfg["crawNumPerSource"]
     global_max_consecutive = cfg["maxConsecutiveNonToday"]
+    max_source_concurrency = cfg.get("maxSourceConcurrency", 5)
 
     db_sources = list_sources_with_configs(include_inactive=False)
     sources = [s for s in db_sources if s.get("config_id") is not None and s.get("checked") == 1]
@@ -61,7 +60,7 @@ async def main():
     api_sources = [s for s in sources if s.get("source_type") == "api"]
     other_sources = [s for s in sources if s.get("source_type") not in ("raw", "api")]
     log(f"Raw 数据源: {len(raw_sources)}, API 数据源: {len(api_sources)}, "
-        f"其他数据源: {len(other_sources)} (并发上限 {MAX_SOURCE_CONCURRENCY})")
+        f"其他数据源: {len(other_sources)} (并发上限 {max_source_concurrency})")
 
     batch_id = start_batch()
     existing_urls = get_all_urls()
@@ -81,17 +80,16 @@ async def main():
         if result:
             api_results.append(result)
 
-    # 其他类型数据源（HTML/ajax/api 走 crawl4ai）：单一浏览器实例复用，
     # 跨源 asyncio.gather 并发，并用 Semaphore 限制同时活跃的 tab 数
     other_results: list[dict] = []
     if other_sources:
-        sem = asyncio.Semaphore(MAX_SOURCE_CONCURRENCY)
+        sem = asyncio.Semaphore(max_source_concurrency)
 
         async def _crawl_one(source, crawler):
             async with sem:
                 return await crawl_html_source(
                     source, batch_id, global_limit, global_max_consecutive,
-                    existing_urls, crawler=crawler,
+                    existing_urls, cfg, crawler=crawler,
                 )
 
         async with AsyncWebCrawler(config=BrowserConfig(headless=True)) as crawler:
@@ -310,7 +308,7 @@ if __name__ == "__main__":
             print(f"结果: 当天入库 {result.get('today', 0)}, 非当天 {result.get('old', 0)}")
         else:
             result = asyncio.run(crawl_html_source(
-                source, batch_id, global_limit, global_max_consecutive, existing_urls,
+                source, batch_id, global_limit, global_max_consecutive, existing_urls, cfg,
             ))
             if result:
                 print(f"结果: 当天入库 {result.get('today', 0)}, 非当天 {result.get('old', 0)}, "

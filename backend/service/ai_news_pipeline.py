@@ -64,18 +64,8 @@ def _list_crawler() -> None:
 
 
 def _news_filter() -> None:
-    from script.crawl.news_filter import main
+    from script.crawl.news_filter_ai import main
     _run_async(main)
-
-
-def _article_crawler() -> None:
-    from script.crawl.article_crawler import main
-    _run_async(main)
-
-
-def _scorer() -> None:
-    from script.score.scorer import main
-    _run_sync(main)
 
 
 def _update_cache() -> None:
@@ -100,11 +90,9 @@ def _update_cache() -> None:
 
 
 STEPS: tuple[Step, ...] = (
-    Step(1, "list_crawler",    "采集新闻列表", _list_crawler),
-    Step(2, "news_filter",     "LLM过滤",      _news_filter),
-    Step(3, "article_crawler", "采集文章正文", _article_crawler),
-    Step(4, "scorer",         "LLM评分",      _scorer),
-    Step(5, "update_cache",   "更新新闻缓存", _update_cache),
+    Step(1, "list_crawler",    "采集新闻列表",    _list_crawler),
+    Step(2, "news_filter",     "过滤+评分二合一", _news_filter),
+    Step(3, "update_cache",   "更新新闻缓存",    _update_cache),
 )
 
 
