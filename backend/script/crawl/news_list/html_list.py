@@ -323,6 +323,9 @@ def extract_with_css_selectors(html: str, source_name: str, list_config: dict, t
     if not selector_cfg:
         return []
 
+    # url_pattern 用于从标题构造 URL（如 href 在 HTML 中缺失的 API 类型页面）
+    url_pattern = list_config.get("url_pattern", "") or ""
+
     # 构建 item 选择器：优先用 css_selector（完整路径），否则结合 container + item
     container_sel = selector_cfg.get("container", "")
     item_only_sel = selector_cfg.get("item", "li")
@@ -415,6 +418,19 @@ def extract_with_css_selectors(html: str, source_name: str, list_config: dict, t
         if not title_el:
             continue
 
+        # 提前获取 title_text（后续 URL 构造需要用到）
+        title_text = title_el.get_text(separator='', strip=True)
+        if title_product_only:
+            m = re.match(r'^\s*\[([^\]]+)\]', title_text)
+            if m:
+                title_text = m.group(1).strip()
+        if title_date_pat:
+            title_text = re.sub(title_date_pat, '', title_text).strip()
+        title_text = re.sub(r'\s+', ' ', title_text).strip()
+
+        if len(title_text) < title_min_len:
+            continue
+
         # URL 提取：优先用 url_sel（支持 CSS selector 或 tag@attr 格式）
         url = ""
         if url_sel:
@@ -424,6 +440,17 @@ def extract_with_css_selectors(html: str, source_name: str, list_config: dict, t
             url = title_el.get("href", "") if hasattr(title_el, 'get') else ""
             if not url and item.name == 'a':
                 url = item.get("href", "")
+        # url_pattern 兜底：从标题构造 URL（API 类型页面，href 不在 HTML 中）
+        if not url and url_pattern and title_text:
+            # 把 {slug} 替换为标题对应的 slug（URL 安全格式）
+            slug = re.sub(r'[^a-zA-Z0-9\-]', '-', title_text.lower())
+            slug = re.sub(r'-+', '-', slug).strip('-')
+            url = url_pattern.replace('{slug}', slug)
+            # 如果构造的 URL 包含非 ASCII 字符（中文等），说明 title 不是英文 slug，跳过
+            try:
+                url.encode('ascii')
+            except UnicodeEncodeError:
+                url = ""  # 跳过中文标题，无法构造有效 URL
         # 相对路径拼接 base_url
         if url and base_url and not url.startswith(('http://', 'https://', '//')):
             url = urljoin(base_url, url)
@@ -450,18 +477,6 @@ def extract_with_css_selectors(html: str, source_name: str, list_config: dict, t
                         if year_mmdd_match:
                             y, mmdd = year_mmdd_match.group(1), year_mmdd_match.group(2)
                             date_str = f"{y}-{mmdd[:2]}-{mmdd[2:]}"
-
-        title_text = title_el.get_text(separator='', strip=True)
-        if title_product_only:
-            m = re.match(r'^\s*\[([^\]]+)\]', title_text)
-            if m:
-                title_text = m.group(1).strip()
-        if title_date_pat:
-            title_text = re.sub(title_date_pat, '', title_text).strip()
-        title_text = re.sub(r'\s+', ' ', title_text).strip()
-
-        if len(title_text) < title_min_len:
-            continue
 
         summary = ""
         #优先用 LLM 分析出的 summary_selector
@@ -516,9 +531,10 @@ def extract_list_articles(html: str, markdown: str, source_name: str, list_confi
     config_type = list_config.get("type", "")
 
     # CSS 选择器提取（优先使用）
+    # 对于 type='api' 的 CSR 页面，API 尚未能直接提取数据时，仍用 CSS 选择器作为备选
     css_articles = []
     use_css_selector = False
-    if config_type == "html" and list_config.get("selector"):
+    if config_type in ("html", "api") and list_config.get("selector"):
         css_articles = extract_with_css_selectors(html, source_name, list_config, title_min_len, base_url)
         if css_articles:
             use_css_selector = True
@@ -694,6 +710,7 @@ async def crawl_html_source(
 
     title_min_len = cfg.get("titleMinLength", 10)
     max_articles_per_source = cfg.get("maxArticlesPerSource", 500)
+    print(f"[DEBUG] cfg: titleMinLen={title_min_len}, days={cfg.get('days')}, maxConsec={cfg.get('maxConsecutiveNonToday')}")
 
     log(f"\n-> Phase1 [List] {name}: {list_url}")
 
@@ -719,7 +736,7 @@ async def crawl_html_source(
     # 是否走 CSS 选择器模式（用于决定后续入库路径：upsert_list_page vs insert_article）
     use_css_selector = bool(
         list_config
-        and list_config.get("type") == "html"
+        and list_config.get("type") in ("html", "api")
         and list_config.get("selector")
     )
 
@@ -744,8 +761,10 @@ async def crawl_html_source(
             break
         local_processed += 1
 
-        if len(art.get("title", "")) < title_min_len:
-            log(f"  -> {art['title'][:40]}... [SKIP] 标题过短（{len(art.get('title', ''))}字）")
+        title = art.get("title", "")
+        title_len = len(title)
+        if title_len < title_min_len:
+            log(f"  -> {title[:40]}... [SKIP] 标题过短（{title_len}字 < {title_min_len}）")
             continue
 
         if consecutive_not_today >= max_consec:
@@ -753,14 +772,15 @@ async def crawl_html_source(
             break
 
         pub_time = art.get("time") or art.get("list_date") or art.get("publish_time") or ""
+        art_url = art.get("url", "")
 
         if not pub_time:
-            if use_css_selector and not art.get("url"):
+            if use_css_selector and not art_url:
                 local_no_date += 1
                 if name not in no_date_sources:
                     no_date_sources[name] = 0
                 no_date_sources[name] += 1
-                log(f"  -> {art['title'][:40]}... [SKIP] CSS选择器模式无日期")
+                log(f"  -> {title[:40]}... [SKIP] CSS选择器模式无日期(url={art_url})")
                 continue
             insert_article({
                 "source_name": name,
@@ -775,12 +795,14 @@ async def crawl_html_source(
             log(f"  -> {art['title'][:40]}... [NO-DATE] 已入库，news_filter 判断")
             continue
 
-        days = cfg["days"]
-        if not is_within_days(pub_time, days=days):
-            local_old += 1
-            consecutive_not_today += 1
-            log(f"  -> {art['title'][:40]}... [SKIP] 非当天 {pub_time}（连续 {consecutive_not_today}/{max_consec}）")
-            continue
+        days = cfg.get("days", 0)
+        # days=0：不过滤（AI新闻场景）；days>0：保留 days 天范围内（股市新闻）
+        if days > 0:
+            if not is_within_days(pub_time, days=days):
+                local_old += 1
+                consecutive_not_today += 1
+                log(f"  -> {art['title'][:40]}... [SKIP] 非当天 {pub_time}（连续 {consecutive_not_today}/{max_consec}）")
+                continue
 
         consecutive_not_today = 0
 

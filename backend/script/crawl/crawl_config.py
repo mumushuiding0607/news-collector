@@ -36,7 +36,6 @@ def get_crawl_config() -> dict:
             "maxArticlesPerSource": type_config.get("maxArticlesPerSource", 500),
             "maxSourceConcurrency": type_config.get("maxSourceConcurrency", 5),
             "htmlFallbackArticles": type_config.get("htmlFallbackArticles", 50),
-            "skipIfNoDate": type_config.get("skipIfNoDate", False),
             "titleMinLength": type_config.get("titleMinLength", 10),
             "days": type_config.get("days", 0),
             # LLM 相关配置保持全局

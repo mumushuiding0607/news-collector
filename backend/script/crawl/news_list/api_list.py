@@ -160,7 +160,7 @@ def _fetch_api_items_new_format(source: dict, target_date: date | None, list_con
         page += 1
 
     # 过滤当天
-    days = cfg.get("days", 3) if cfg else (3 if is_ai_news_db() else 0)
+    days = list_config.get("days", 3) if is_ai_news_db() else 0
     today_items = _filter_today_items_new_format(all_items, list_config, target_date, days)
     return [
         {
@@ -215,7 +215,7 @@ def _fetch_api_items_old_format(source: dict, target_date: date | None, list_con
         all_items.extend(items)
         page += 1
 
-    days = cfg.get("days", 3) if cfg else (3 if is_ai_news_db() else 0)
+    days = list_config.get("days", 3) if is_ai_news_db() else 0
     today_items = _filter_today_items_old_format(all_items, field_mapping, list_config, target_date, days)
     return [
         {
@@ -295,7 +295,7 @@ def _crawl_generic_api(source: dict, batch_id: int, target_date: date | None, li
     log(f"  获取到 {len(all_items)} 条数据")
 
     # 过滤当天数据（按 date_format 决定比较方式）
-    days = cfg.get("days", 3) if cfg else (3 if is_ai_news_db() else 0)
+    days = list_config.get("days", 3) if is_ai_news_db() else 0
     today_items = _filter_today_items(all_items, field_mapping, list_config, target_date, days)
     log(f"  当天 {len(today_items)} 条")
 

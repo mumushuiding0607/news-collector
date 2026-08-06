@@ -12,12 +12,15 @@ def save_learned_config(
     content_config: dict,
 ) -> bool:
     """Step 5: 保存到 source_crawl_configs 表"""
+    import sys as _sys
+    print(f"[DEBUG save_learned_config] list_config id={id(list_config) if list_config else None}, url_pattern={list_config.get('url_pattern') if list_config else None}", file=_sys.stderr)
     if list_config is None:
         log("[统一学习] 无配置且无样本新闻，放弃保存")
         return False
 
     try:
         saved_list_config, saved_source_type = extract_saved_list_config(list_config)
+        print(f"[DEBUG save_learned_config] saved_list_config id={id(saved_list_config) if saved_list_config else None}, url_pattern={saved_list_config.get('url_pattern') if saved_list_config else None}", file=_sys.stderr)
 
         ce = content_config.get("content_extract") if content_config else None
         pt = _resolve_publish_time_pattern(content_config, saved_list_config)
@@ -42,7 +45,19 @@ def extract_saved_list_config(list_config: dict | None) -> tuple[dict | None, st
     if not list_config:
         return None, None
     if isinstance(list_config, dict) and "list_config" in list_config:
-        return list_config.get("list_config"), list_config.get("source_type")
+        nested = list_config.get("list_config")
+        # 如果 url_pattern/type 在外层但不在内层，需要拷贝过去
+        # (_set_url_pattern 在外层设置了 url_pattern 和 type='api')
+        if isinstance(nested, dict):
+            if list_config.get("url_pattern") and not nested.get("url_pattern"):
+                nested["url_pattern"] = list_config["url_pattern"]
+            if list_config.get("type") == "api" and nested.get("type") != "api":
+                nested["type"] = "api"
+            # 外层 article 有有效 URL（网络捕获 discovered）时，覆盖嵌套的 article
+            outer_article = list_config.get("article") or {}
+            if outer_article and outer_article.get("url") and outer_article.get("url") != outer_article.get("title", ""):
+                nested["article"] = outer_article
+        return nested, list_config.get("source_type")
     return list_config, None
 
 

@@ -93,6 +93,11 @@ def _run_list_discovery(url: str, list_html: str, headline: str, force_relearn: 
     saved_source_type = discovered.get("source_type") if isinstance(discovered, dict) else None
     lc = discovered.get("list_config") if isinstance(discovered, dict) and "list_config" in discovered else discovered
 
+    # LLM 返回的 article 在顶层响应中，需要拷贝到嵌套的 list_config 中，
+    # 方便后续 extract_sample_article 统一访问
+    if isinstance(discovered, dict) and isinstance(lc, dict) and "article" in discovered:
+        lc["article"] = discovered["article"]
+
     if isinstance(lc, dict):
         if lc.get("type") == "raw":
             method = "raw_fetch"

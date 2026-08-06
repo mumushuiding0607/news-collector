@@ -439,6 +439,43 @@ def main():
     ))
 
 
+def _prepend_to_latest_cache(news_items: list[dict]) -> None:
+    """把 news_items 直接插入 news_latest.json 头部（不清重，不排序）。
+    仅插入 importance_score >= 6 的重点新闻。
+    """
+    import json
+    from pathlib import Path
+    LATEST_PATH = Path(APP_ROOT).parent / "cache" / "news_latest.json"
+    LATEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    if LATEST_PATH.exists():
+        cache = json.loads(LATEST_PATH.read_text(encoding="utf-8"))
+    else:
+        cache = {"data": [], "count": 0}
+
+    new_records = [
+        {
+            "id": r["news_id"],
+            "title": r.get("title", ""),
+            "url": r.get("url", ""),
+            "source_name": r.get("source_name", ""),
+            "publish_time": r.get("publish_time", ""),
+            "summary": r.get("summary", ""),
+            "importance_score": r.get("importance_score", 0),
+            "related_sectors": r.get("related_sectors", ""),
+            "direction": r.get("direction", ""),
+            "reason": r.get("reason", ""),
+        }
+        for r in news_items
+        if not r.get("skipped") and r.get("importance_score", 0) >= 6
+    ]
+
+    if new_records:
+        cache["data"] = new_records + cache["data"]
+        cache["count"] = len(cache["data"])
+        LATEST_PATH.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 async def _run_main_loop(limit: int, batch_size: int, max_cycles: int, dry_run: bool) -> None:
     cycle = 0
     total_ok = total_skip = total_failed = 0
@@ -474,6 +511,11 @@ async def _run_main_loop(limit: int, batch_size: int, max_cycles: int, dry_run: 
                     total_failed += 1
                 else:
                     total_failed += 1
+
+            # 每批评分后，仅将重点新闻（score >= 6）插入 latest 缓存头部
+            if not dry_run:
+                scored_items = [r for r in results if not r.get("skipped")]
+                _prepend_to_latest_cache(scored_items)
 
     log("=" * 60)
     log(f"完成: 评分入库 {total_ok}, 跳过 {total_skip}, 评分失败(待重试) {total_failed}")

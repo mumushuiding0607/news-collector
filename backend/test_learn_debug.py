@@ -9,8 +9,7 @@ result = learn_source_config(
     name='腾讯研究院',
     force_relearn=True,
 )
-print('Result type:', type(result))
-print('article_url:', result.get('article_url'))
-print('article_title:', result.get('article_title'))
-print('list_complete:', result.get('list_complete'))
-print('source_type:', result.get('source_type'))
+print(f"article_url: {result.get('article_url')}")
+print(f"article_title: {result.get('article_title', '')[:40] if result.get('article_title') else 'None'}")
+print(f"list_complete: {result.get('list_complete')}")
+print(f"content_extract: {result.get('content_extract', {})}")

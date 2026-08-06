@@ -5,6 +5,27 @@ from script.discovery.util.sample_log import log_sample_news
 from script.discovery.util.validation import is_valid_news_sample
 
 
+def _set_url_pattern(list_config: dict, article_url: str) -> None:
+    """从样本 article_url 提取 url_pattern 并更新到 list_config。
+
+    例如 article_url="http://hy.tencent.com/research/hyra"
+    → url_pattern="http://hy.tencent.com/research/{slug}"
+    """
+    from urllib.parse import urlparse
+    parsed = urlparse(article_url)
+    # 提取路径部分，如 "/research/hyra" → 变成 "/research/{slug}"
+    path_parts = parsed.path.rstrip('/').split('/')
+    if path_parts:
+        path_parts[-1] = '{slug}'
+        pattern_path = '/'.join(path_parts)
+        # 重建 URL：scheme + netloc + pattern_path
+        url_pattern = f"{parsed.scheme}://{parsed.netloc}{pattern_path}"
+        list_config['url_pattern'] = url_pattern
+        if list_config.get('type') != 'api':
+            list_config['type'] = 'api'  # 标记为 API 类型，便于区分处理
+        log(f"[统一学习] 发现 url_pattern: {url_pattern}")
+
+
 def extract_sample_article(
     list_config: dict | None,
     list_html: str,
@@ -12,12 +33,31 @@ def extract_sample_article(
     base_url: str = "",
 ) -> tuple[str | None, str | None, list]:
     """Step 3: 从 LLM 输出 → extract_article_links → raw HTML → 网络捕获 四段式回退提取样本文章 URL"""
+    import re as _re
     llm_article = list_config.get("article") if list_config else None
     article_url = llm_article.get("url") if llm_article else None
     article_title = llm_article.get("title") if llm_article else None
     sample_news = []
 
+    # 判断 LLM 返回的 URL 是否为占位符（如 /article/1）
+    def _is_placeholder(url):
+        if not url:
+            return True
+        if _re.match(r'.*/(article|news|detail|view|page|p)\s*/\d+$', url, _re.IGNORECASE):
+            return True
+        if '标题样例' in (article_title or ''):
+            return True
+        return False
+
+    # 如果 LLM 返回的是占位符，忽略它，继续往后走（尝试网络捕获）
+    if article_url and _is_placeholder(article_url):
+        log(f"[统一学习] LLM 返回占位符 URL: {article_url}，跳过继续往后")
+        article_url = None
+
     if article_url:
+        # 从 LLM 分析发现的 URL 提取 url_pattern
+        if list_config and not list_config.get('url_pattern'):
+            _set_url_pattern(list_config, article_url)
         return article_url, article_title, sample_news
 
     # 回退 1: extract_article_links（markdown 模式 [标题](URL)）
@@ -37,6 +77,15 @@ def extract_sample_article(
     if not article_url and base_url:
         article_url, article_title, sample_news = _try_network_capture_discovery(base_url, list_config)
         if article_url:
+            print(f"[DEBUG network capture] found article_url={article_url}", file=__import__('sys').stderr)
+            # 从样本 URL 提取 url_pattern
+            if list_config and not list_config.get('url_pattern'):
+                print(f"[DEBUG before _set_url_pattern] list_config id={id(list_config)}, url_pattern={list_config.get('url_pattern')}", file=__import__('sys').stderr)
+                _set_url_pattern(list_config, article_url)
+                print(f"[DEBUG after _set_url_pattern] list_config id={id(list_config)}, url_pattern={list_config.get('url_pattern')}", file=__import__('sys').stderr)
+            # 把发现的 article URL/title 存回 list_config（方便后续保存到 DB）
+            if list_config is not None:
+                list_config['article'] = {"url": article_url, "title": article_title or ""}
             return article_url, article_title, sample_news
 
     # 输出样本新闻
@@ -80,17 +129,14 @@ def _try_network_capture_discovery(
     捕获文章列表 API，再从中提取第一篇文章的 URL。
     """
     import asyncio, json, re
-    from urllib.parse import urljoin
+    from urllib.parse import urlparse
 
     try:
         from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
     except ImportError:
         return None, None, []
 
-    # 提取 base_url 的 origin 用于判断 API 是否同源
-    from urllib.parse import urlparse
     parsed_base = urlparse(base_url)
-    origin = f"{parsed_base.scheme}://{parsed_base.netloc}"
 
     async def _capture_and_discover():
         async with AsyncWebCrawler(config=BrowserConfig(headless=True)) as crawler:
@@ -161,15 +207,16 @@ def _try_network_capture_discovery(
 def _try_api_with_samples(api_url: str, base_url: str) -> list[dict]:
     """对候选 API 发请求，验证返回并提取文章列表"""
     import json, requests
+    from urllib.parse import urlparse
 
     # 处理相对 URL
     if api_url.startswith("/"):
-        from urllib.parse import urlparse
         parsed = urlparse(base_url)
         api_url = f"{parsed.scheme}://{parsed.netloc}{api_url}"
 
+    parsed_base = urlparse(base_url)
     headers = {
-        "Origin": f"{urlparse(base_url).scheme}://{urlparse(base_url).netloc}",
+        "Origin": f"{parsed_base.scheme}://{parsed_base.netloc}",
         "Referer": base_url,
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Accept": "application/json, text/plain, */*",

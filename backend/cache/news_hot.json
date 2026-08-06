@@ -1,5 +1,335 @@
 {
-  "data": [],
-  "batch_time": null,
-  "count": 0
+  "data": [
+    {
+      "id": 1096,
+      "title": "先进封装概念反弹 长电科技涨停",
+      "url": "https://m.cnstock.com/commonDetail/755924",
+      "source_name": "上证报",
+      "publish_time": "2026-08-06 11:00:00",
+      "summary": "先进封装概念强劲反弹，长电科技涨停，甬矽电子、劲拓股份涨超10%，通富微电、盛合晶微、华天科技等跟涨超5%。",
+      "related_sectors": "半导体|先进封装",
+      "importance_score": 8.2,
+      "reason": "多只概念股涨停显示资金集中涌入，先进封装作为AI芯片关键环节受关注度高。涨停个股覆盖全产业链，表明市场对板块前景形成共识。",
+      "direction": "积极",
+      "intensity": 4,
+      "expected_change": "±10%",
+      "duration": "短期",
+      "expectation_level": "中等预期",
+      "market_mode": "脉冲式",
+      "max_sector_rise": 0.0,
+      "publish_sector_values": "半导体:16166.677|先进封装:2546.146",
+      "current_sector_values": "半导体:16166.677|先进封装:2546.146",
+      "current_sector_change_rates": "1.18|1.34",
+      "created_at": "2026-08-06 11:34:35",
+      "core_stocks_preview": [
+        {
+          "code": "600584",
+          "name": "长电科技",
+          "tier": "第一梯队",
+          "chain_link": "中游制造-封测",
+          "four_dims": {
+            "竞争": "高",
+            "盈利": "高",
+            "客户": "高",
+            "技术": "高"
+          },
+          "moat": "全球第三大封测厂商，2.5D/3D封装国内最强，Chiplet量产能力领先，深度绑定华为/AMD/高通",
+          "news_related": "先进封装反弹直接受益，HPC/AI需求驱动先进封装产能持续紧缺",
+          "d1": null,
+          "d2": null,
+          "d3": null
+        },
+        {
+          "code": "002156",
+          "name": "通富微电",
+          "tier": "第二梯队",
+          "chain_link": "中游制造-封测",
+          "four_dims": {
+            "竞争": "中",
+            "盈利": "高",
+            "客户": "高",
+            "技术": "高"
+          },
+          "moat": "AMD最大封装供应商，Chiplet技术国内领先，深度绑定AMD/三星/海思",
+          "news_related": "先进封装反弹直接受益，Chiplet封装需求快速增长",
+          "d1": null,
+          "d2": null,
+          "d3": null
+        },
+        {
+          "code": "002185",
+          "name": "华天科技",
+          "tier": "第二梯队",
+          "chain_link": "中游制造-封测",
+          "four_dims": {
+            "竞争": "中",
+            "盈利": "中",
+            "客户": "中",
+            "技术": "中"
+          },
+          "moat": "国内第三大封测厂商，Flip Chip/SiP封装技术成熟，客户覆盖华为海思/展锐等",
+          "news_related": "先进封装反弹直接受益，国产替代加速",
+          "d1": null,
+          "d2": null,
+          "d3": null
+        }
+      ]
+    },
+    {
+      "id": 1090,
+      "title": "MINIMAX-W涨超16%  调入港股通今日生效",
+      "url": "https://m.cnstock.com/commonDetail/755911",
+      "source_name": "上证报",
+      "publish_time": "2026-08-06 10:47:00",
+      "summary": "MINIMAX-W因调入港股通今日生效，股价涨超16%，更多内地投资者可参与交易，流动性改善预期升温。",
+      "related_sectors": "沪股通|人工智能",
+      "importance_score": 8.1,
+      "reason": "调入港股通是制度性利好，扩大投资者基础且今日生效，股价已快速反映，但中期仍有配置价值。",
+      "direction": "积极",
+      "intensity": 4,
+      "expected_change": "±20%",
+      "duration": "中期",
+      "expectation_level": "重大预期",
+      "market_mode": "趋势主升",
+      "max_sector_rise": 0.0,
+      "publish_sector_values": "沪股通:2319.324|人工智能:1280.78",
+      "current_sector_values": "沪股通:2319.324|人工智能:1280.78",
+      "current_sector_change_rates": "-0.25|-0.37",
+      "created_at": "2026-08-06 11:00:10",
+      "core_stocks_preview": []
+    },
+    {
+      "id": 1148,
+      "title": "加快培育新增长点 绿色燃料产业支持政策将出",
+      "url": "https://www.cnenergynews.cn/article/4SgJrcH25wX",
+      "source_name": "中国能源报",
+      "publish_time": "2026-08-06 10:09:00",
+      "summary": "国家能源局发布《中国绿色燃料发展报告2026》，提出'十五五'时期将制定绿色燃料产业发展系列文件，加快培育绿色甲醇、绿色合成氨、绿色航空燃料等新增长点。",
+      "related_sectors": "新能源汽车|煤化工概念",
+      "importance_score": 8,
+      "reason": "政策信号明确且具体，提出千万吨油当量产业目标，涉及风光发电36亿千瓦装机和6.17亿吨有机废弃物利用，属于宏大叙事级别的产业规划，对相关板块有中长期指导意义。",
+      "direction": "积极",
+      "intensity": 4,
+      "expected_change": "±10%",
+      "duration": "长期",
+      "expectation_level": "重大预期",
+      "market_mode": "趋势主升",
+      "max_sector_rise": 0.0,
+      "publish_sector_values": "新能源汽车:4428.486|煤化工概念:2345.454",
+      "current_sector_values": "新能源汽车:4428.486|煤化工概念:2345.454",
+      "current_sector_change_rates": "-0.36|0.22",
+      "created_at": "2026-08-06 11:49:26",
+      "core_stocks_preview": [
+        {
+          "code": "002895",
+          "name": "川恒股份",
+          "tier": "第二梯队",
+          "chain_link": "上游-磷化工原料供应",
+          "four_dims": {
+            "竞争": "高",
+            "盈利": "中",
+            "客户": "高",
+            "技术": "中"
+          },
+          "moat": "磷矿资源储量国内前列，已布局绿色燃料用氢能产业链上游，具备磷化工与新能源双赛道协同",
+          "news_related": "绿色燃料政策加码带动上游磷矿资源需求，公司切入绿氢制备磷化工副产链条",
+          "d1": null,
+          "d2": null,
+          "d3": null
+        }
+      ]
+    },
+    {
+      "id": 1139,
+      "title": "长征八号甲遥十圆满发射卫星互联网低轨23组，多项关键技术实现突破；SpaceX拟建地面基",
+      "url": "https://www.nbd.com.cn/articles/2026-08-06/4533465.html",
+      "source_name": "每日经济新闻",
+      "publish_time": "2026-08-06 08:30:40",
+      "summary": "长征八号甲遥十成功发射卫星互联网低轨23组，创国内入轨总重量及氢氧末级关键技术里程碑，可将卫星直达1100公里轨道。SpaceX在财报会上披露将建地面基础设施与卫星网络互补，正面挑战AT&T、Verizon、T-Mobile三大运营商，开启天地融合通信新竞争时代。星地通信产业2030年规模预计达2000-4000亿元。",
+      "related_sectors": "卫星导航|通信设备",
+      "importance_score": 8,
+      "reason": "国内火箭技术突破+SpaceX披露商业化扩张计划，全球低轨卫星互联网竞争升级。SpaceX切入城市主流市场打破地面运营商垄断，市场空间数千亿美元，行业格局从辅助工具升级为替代方案，长期增长逻辑明确。",
+      "direction": "积极",
+      "intensity": 5,
+      "expected_change": "±10%",
+      "duration": "长期",
+      "expectation_level": "重大预期",
+      "market_mode": "趋势主升",
+      "max_sector_rise": 0.0,
+      "publish_sector_values": "卫星导航:4402.911|通信设备:8911.85",
+      "current_sector_values": "卫星导航:4402.911|通信设备:8911.85",
+      "current_sector_change_rates": "0.33|2.03",
+      "created_at": "2026-08-06 11:47:39",
+      "core_stocks_preview": [
+        {
+          "code": "002025",
+          "name": "航天电器",
+          "tier": "第一梯队",
+          "chain_link": "上游-宇航级连接器",
+          "four_dims": {
+            "竞争": "高",
+            "盈利": "高",
+            "客户": "高",
+            "技术": "高"
+          },
+          "moat": "宇航级连接器国内市占率超70%，配套国内所有主流运载火箭型号，特斯拉Starlink国内对标星座核心受益标的",
+          "news_related": "卫星互联网低轨组网加速带动宇航级连接器需求，公司为国内唯一具备全系列宇航级连接器量产能力厂商",
+          "d1": null,
+          "d2": null,
+          "d3": null
+        },
+        {
+          "code": "600879",
+          "name": "航天电子",
+          "tier": "第一梯队",
+          "chain_link": "中游-火箭/卫星配套",
+          "four_dims": {
+            "竞争": "高",
+            "盈利": "高",
+            "客户": "高",
+            "技术": "高"
+          },
+          "moat": "航天科技集团旗下核心配套商，遥测遥控系统国内市占率超60%，配套长征八号甲等多型主力火箭，独家供应商地位稳固",
+          "news_related": "长征八号甲遥十成功发射创多项里程碑，公司配套遥测系统和氢氧末级关键技术直接受益",
+          "d1": null,
+          "d2": null,
+          "d3": null
+        },
+        {
+          "code": "002383",
+          "name": "合众思壮",
+          "tier": "第二梯队",
+          "chain_link": "下游-地面设备/通信终端",
+          "four_dims": {
+            "竞争": "中",
+            "盈利": "中",
+            "客户": "高",
+            "技术": "高"
+          },
+          "moat": "卫星通信地面终端国内领先厂商，SpaceX地面基础设施与卫星网络互补战略将直接带动地面通信设备需求，公司已布局星地融合通信终端",
+          "news_related": "星地融合通信新竞争时代开启，地面基础设施需求爆发式增长",
+          "d1": null,
+          "d2": null,
+          "d3": null
+        },
+        {
+          "code": "688270",
+          "name": "臻镭科技",
+          "tier": "第二梯队",
+          "chain_link": "上游-星载射频芯片",
+          "four_dims": {
+            "竞争": "高",
+            "盈利": "高",
+            "客户": "高",
+            "技术": "高"
+          },
+          "moat": "国内星载射频收发芯片唯一量产供应商，卫星互联网低轨组网核心受益，已进入国家卫星互联网总体单位供应链",
+          "news_related": "低轨卫星批量部署带动星载芯片需求爆发，公司作为核心射频芯片供应商直接受益",
+          "d1": null,
+          "d2": null,
+          "d3": null
+        }
+      ]
+    },
+    {
+      "id": 1154,
+      "title": "[第一时间]“人形机器人第一股”开启IPO初步询价 宇树科技IPO启动初步询价 机构预测每股或超百元",
+      "url": "https://tv.cctv.com/2026/08/06/VIDEtPILnWZsrD6bGu4Tfq8i260806.shtml",
+      "source_name": "第一时间",
+      "publish_time": "2026-08-06 07:13:55",
+      "summary": "宇树科技IPO正式启动初步询价，机构预测每股价格可能超过百元，刷新人形机器人企业估值预期，显示资本对具身智能商业化前景看好。",
+      "related_sectors": "机器人概念|专用设备",
+      "importance_score": 8,
+      "reason": "具体价格预测超百元，赋予明确数字锚点，若定价符合预期将强化板块做多情绪，具身智能商业化进程获资金认可。",
+      "direction": "积极",
+      "intensity": 4,
+      "expected_change": "±10%",
+      "duration": "短期",
+      "expectation_level": "中等预期",
+      "market_mode": "脉冲式",
+      "max_sector_rise": 0.0,
+      "publish_sector_values": "机器人概念:3803.964|专用设备:7177.351",
+      "current_sector_values": "机器人概念:3803.964|专用设备:7177.351",
+      "current_sector_change_rates": "-0.32|0.13",
+      "created_at": "2026-08-06 11:54:49",
+      "core_stocks_preview": [
+        {
+          "code": "688017",
+          "name": "绿的谐波",
+          "tier": "第一梯队",
+          "chain_link": "上游-减速器",
+          "four_dims": {
+            "竞争": "高",
+            "盈利": "高",
+            "客户": "高",
+            "技术": "高"
+          },
+          "moat": "国产谐波减速器全球市占率前三，国内市占率第一，已进入特斯拉Optimus等头部人形机器人供应链并实现批量供货",
+          "news_related": "人形机器人量产提速带动核心零部件谐波减速器需求爆发，公司为国内唯一年产能超百万台级供应商",
+          "d1": null,
+          "d2": null,
+          "d3": null
+        },
+        {
+          "code": "002536",
+          "name": "飞龙股份",
+          "tier": "第二梯队",
+          "chain_link": "上游-电机驱动/散热系统",
+          "four_dims": {
+            "竞争": "高",
+            "盈利": "中",
+            "客户": "高",
+            "技术": "高"
+          },
+          "moat": "人形机器人电机散热模组国内稀缺供应商，已进入头部机器人整机厂量产供应链，切换成本极高",
+          "news_related": "具身智能商业化加速带动上游电机散热需求爆发",
+          "d1": null,
+          "d2": null,
+          "d3": null
+        },
+        {
+          "code": "688799",
+          "name": "华纳药厂",
+          "tier": "第二梯队",
+          "chain_link": "上游-传感器/灵巧手核心部件",
+          "four_dims": {
+            "竞争": "高",
+            "盈利": "高",
+            "客户": "中",
+            "技术": "高"
+          },
+          "moat": "国内手指集成关节模组稀缺供应商，灵巧手微型伺服电机国内领先，已进入多家人形机器人整机厂商供应链",
+          "news_related": "人形机器人IPO热潮提升产业链估值，公司作为灵巧手核心部件供应商直接受益",
+          "d1": null,
+          "d2": null,
+          "d3": null
+        }
+      ]
+    },
+    {
+      "id": 1157,
+      "title": "内存短缺或持续至2027年；长鑫拒绝苹果压价｜数智早参",
+      "url": "https://www.nbd.com.cn/articles/2026-08-05/4533370.html",
+      "source_name": "每日经济新闻",
+      "publish_time": "2026-08-06 07:00:07",
+      "summary": "三大内存原厂2027年产能已全部售罄，内存短缺预计持续至2027年，客户仅获得初始请求的60%-70%。长鑫存储拒绝苹果压价，要求报价不低于三星和SK海力士，华为小米等已锁定其产能。",
+      "related_sectors": "半导体|存储芯片",
+      "importance_score": 8,
+      "reason": "存储器正式进入极致卖方主导阶段，供需失衡持续至2027年，价格上涨预期明确。国产DRAM厂商议价权显著提升，苹果失去低价采购国产DRAM的谈判筹码，行业格局深度改变。",
+      "direction": "积极",
+      "intensity": 4,
+      "expected_change": "±10%",
+      "duration": "中期",
+      "expectation_level": "中等预期",
+      "market_mode": "趋势主升",
+      "max_sector_rise": 0.0,
+      "publish_sector_values": "半导体:16166.677|存储芯片:2542.806",
+      "current_sector_values": "半导体:16166.677|存储芯片:2542.806",
+      "current_sector_change_rates": "1.18|1.24",
+      "created_at": "2026-08-06 11:55:21",
+      "core_stocks_preview": []
+    }
+  ],
+  "batch_time": "2026-08-06 11:34:35",
+  "count": 6
 }
