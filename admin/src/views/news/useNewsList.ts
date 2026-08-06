@@ -1,5 +1,5 @@
 import { ref, watch } from "vue";
-import { getNewsList, getPrimarySourcesList, getAiAllNews, markUseful } from "../../api";
+import { getNewsList, getPrimarySourcesList, getAiNewsList, markUseful } from "../../api";
 import { useNewsTypeStore } from "../../stores/newsType";
 import type { TabType } from "./types";
 
@@ -13,30 +13,33 @@ export function useNewsList() {
   async function fetchList(tab: TabType) {
     loading.value = true;
     try {
-      // AI 新闻：使用 getAiAllNews
+      // AI 新闻
       if (newsTypeStore.newsType === "ai") {
-        const res = (await getAiAllNews()) as {
-          latest?: { data?: Record<string, unknown>[]; count?: number };
-          history?: { data?: Record<string, unknown>[]; count?: number };
+        const params = {
+          page: pagination.value.page,
+          limit: pagination.value.limit,
+          source_name: filterForm.value.source_name || undefined,
+          title: filterForm.value.title || undefined,
+          summary: filterForm.value.summary || undefined,
         };
-        const latestData = res.latest?.data || [];
-        const historyData = res.history?.data || [];
-        const combined = [...latestData, ...historyData];
+        const res = (await getAiNewsList(params)) as {
+          list?: Record<string, unknown>[];
+          total?: number;
+        };
         // 转换为与股市新闻相同的字段名
-        tableData.value = combined.map((item: Record<string, unknown>) => ({
+        tableData.value = (res.list || []).map((item: Record<string, unknown>) => ({
           id: item.id,
           title: item.title,
           url: item.url,
-          source_name: item.sourceName,
-          publish_time: item.publishTime,
+          source_name: item.source_name,
+          publish_time: item.publish_time,
           summary: item.summary || item.highlights || "",
           importance_score: item.score,
           reason: item.reason,
-          content_length: item.content ? String(item.content).length : 0,
           status: "scored",
           is_useful: null,
         }));
-        pagination.value.total = (res.latest?.count || 0) + (res.history?.count || 0);
+        pagination.value.total = res.total || 0;
         return;
       }
 

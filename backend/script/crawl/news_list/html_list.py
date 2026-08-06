@@ -19,6 +19,8 @@ from script.common.util import parse_publish_time, is_today, is_within_days
 from script.crawl.crawl_db import insert_article, upsert_list_page
 from script.bootstrap import is_ai_news_db
 from script.discovery.util.html_fetch import fetch_list_html
+# Heading 标签元组（用于查找标题元素和标题兄弟元素终止条件）
+HEADING_TAGS = ('h1', 'h2', 'h3', 'h4', 'h5', 'h6')
 
 # 静默 Crawl4AI 初始化日志（→ Crawl4AI x.x.x）
 for _logger_name in ["crawl4ai", "Crawl4AI"]:
@@ -27,6 +29,7 @@ for _logger_name in ["crawl4ai", "Crawl4AI"]:
 
 # 常量
 MAX_SUBTITLE_LEN = 300
+MAX_SIBLING_DEPTH = 10  # 兄弟元素遍历最大深度
 
 
 # 纯时间格式（HH:MM / HH:MM:SS）→ 今天日期 + 该时间
@@ -55,7 +58,7 @@ def log(msg: str):
     _log("list_crawler", msg)
 
 
-def _extract_attr_by_selector(element: BeautifulSoup, selector: str, attr: str) -> str:
+def _extract_attr_by_selector(element: BeautifulSoup, selector: str, attr: str = "") -> str:
     """
     从 element 中提取属性值。
 
@@ -67,21 +70,20 @@ def _extract_attr_by_selector(element: BeautifulSoup, selector: str, attr: str) 
     Args:
         element: BeautifulSoup 元素
         selector: 选择器字符串
-        attr: 要提取的属性名
+        attr: 要提取的属性名（可空，内部从 @ 语法自动推断）
 
     Returns:
         属性值字符串
     """
-    if not selector or not attr:
+    if not selector:
         return ""
 
     if '@' in selector:
-        # tag@attr 格式
+        # tag@attr / CSS@attr 格式：自动从 selector 中提取属性名
         parts = selector.split('@', 1)
         css_sel = parts[0].strip()
-        attr_name = parts[1].strip() if len(parts) > 1 else attr
+        attr_name = parts[1].strip()  # @ 前必定有内容，split 必产生 2 部分
         if not css_sel:
-            # 直接是 @attr 格式，从 element 获取
             return element.get(attr_name, "")
         try:
             el = element.select_one(css_sel)
@@ -94,7 +96,7 @@ def _extract_attr_by_selector(element: BeautifulSoup, selector: str, attr: str) 
         try:
             el = element.select_one(selector)
             if el:
-                return el.get(attr, "")
+                return el.get(attr or "href", "")
         except Exception:
             pass
 
@@ -367,14 +369,20 @@ def extract_with_css_selectors(html: str, source_name: str, list_config: dict, t
         date_str = None
         if date_sel:
             try:
-                date_el = item.select_one(date_sel)
-                if date_el:
-                    date_str = date_el.get_text(strip=True)
-                    raw_date_text = date_str
-                    date_str = parse_publish_time(date_str)
-                    # 纯时间格式（HH:MM / HH:MM:SS）回退：视为今天
-                    if not date_str and raw_date_text:
-                        date_str = _parse_time_only_as_today(raw_date_text)
+                # 支持 tag@attr 格式（如 time@datetime）
+                if '@' in date_sel:
+                    date_val = _extract_attr_by_selector(item, date_sel, "")
+                    if date_val:
+                        date_str = parse_publish_time(date_val)
+                        if not date_str:
+                            date_str = _parse_time_only_as_today(date_val)
+                else:
+                    date_el = item.select_one(date_sel)
+                    if date_el:
+                        raw_date_text = date_el.get_text(strip=True)
+                        date_str = parse_publish_time(raw_date_text)
+                        if not date_str and raw_date_text:
+                            date_str = _parse_time_only_as_today(raw_date_text)
             except Exception:
                 pass
 
@@ -390,17 +398,30 @@ def extract_with_css_selectors(html: str, source_name: str, list_config: dict, t
             if keyword:
                 title_el = _find_element_by_text_content(item, 'h3', keyword)
 
+        # 兜底：从标题元素的兄弟元素中查找日期（date_sel 为空或解析失败时触发）
+        if title_el:
+            for sibling in title_el.find_next_siblings()[:MAX_SIBLING_DEPTH]:
+                # 遇到下一个标题元素则停止
+                if sibling.name in HEADING_TAGS:
+                    break
+                sibling_text = sibling.get_text(strip=True)
+                # 预过滤：日期字符串通常较短且包含数字和分隔符
+                if sibling_text and 4 < len(sibling_text) < 30 and re.search(r'\d', sibling_text):
+                    date_str = parse_publish_time(sibling_text)
+                    if date_str:
+                        break
+
         # 如果 title_sel 为 "a" 且 item 是 <a> 标签，先查找内部 heading 元素
         # 避免提取到日期+作者+标题+摘要等全部文本
         if not title_el and item.name == 'a' and title_sel == 'a':
-            heading_el = item.find(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+            heading_el = item.find(HEADING_TAGS)
             if heading_el:
                 title_el = heading_el
 
         # 如果 title_el 选中了 item 自身（即选择器返回了容器本身），且 item 内有 heading 子元素，
         # 说明选择器太宽泛，语义上的标题是内部的 h1-h6，优先使用 heading（通用回退，适用于所有卡片式列表）
         if title_el is item and item.name in ('a', 'div', 'section', 'article', 'li'):
-            heading_el = item.find(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+            heading_el = item.find(HEADING_TAGS)
             if heading_el:
                 title_el = heading_el
 

@@ -43,6 +43,7 @@ def get_crawl_config() -> dict:
             "llmTimeout": data.get("llmTimeout", 120),
             "llmMaxRetries": data.get("llmMaxRetries", 3),
             "newsFilterTimeout": data.get("newsFilterTimeout", 120),
+            "newsFilterBatchSize": data.get("newsFilterBatchSize", 5),
             "scorerTimeout": data.get("scorerTimeout", 120),
             "findStocksTimeout": data.get("findStocksTimeout", 120),
         }

@@ -21,6 +21,7 @@
   "llmTimeout": 120,
   "llmMaxRetries": 3,
   "newsFilterTimeout": 40,
+  "newsFilterBatchSize": 5,
   "scorerTimeout": 90,
   "findStocksTimeout": 80,
   "newsCache": {

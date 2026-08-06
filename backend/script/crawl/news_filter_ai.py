@@ -147,7 +147,7 @@ async def main():
     log(f"[News Filter AI] start {now_iso()}" + (" [重试模式]" if args.retry else ""))
 
     cfg = get_crawl_config()
-    batch_size = cfg["llmBatchSize"]
+    batch_size = cfg.get("newsFilterBatchSize", cfg["llmBatchSize"])
     timeout = cfg["newsFilterTimeout"]
     max_retries = cfg["llmMaxRetries"]
     log(f"批量大小: {batch_size}, 超时: {timeout}s, 最大重试: {max_retries}")
@@ -192,9 +192,13 @@ async def main():
 
             if llm_item:
                 result = build_ai_result(news, llm_item)
-                insert_ai(result)
-                mark_useful(news_id, useful=1, commit=False, conn=conn)
-                total_scored += 1
+                ok = insert_ai(result, conn=conn, commit=False)
+                if ok:
+                    mark_useful(news_id, useful=1, commit=False, conn=conn)
+                    total_scored += 1
+                else:
+                    mark_useful(news_id, useful=-1, commit=False, conn=conn)
+                    total_failed += 1
             else:
                 mark_useful(news_id, useful=-1, commit=False, conn=conn)
                 total_failed += 1

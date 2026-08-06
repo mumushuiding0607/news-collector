@@ -41,4 +41,4 @@ superpowers/
 *.db
 *.db-wal
 *.db-shm
-*.db-corrupt
+*.db-corruptbackend/cache/

@@ -283,6 +283,37 @@ def get_ai_news_all(request: Request):
     }
 
 
+@router.get("/news/ai/list")
+def get_ai_news_list(request: Request, page: int = 1, limit: int = 20,
+                     source_name: str | None = None,
+                     title: str | None = None, summary: str | None = None):
+    """
+    AI 新闻管理分页列表（管理员）。
+    支持按 source_name、title、summary 过滤。
+    """
+    conditions = ["ia.source_name IS NOT NULL"]
+    params: tuple = ()
+
+    if source_name:
+        conditions.append("ia.source_name LIKE ?")
+        params = (*params, f"%{source_name}%")
+    if title:
+        conditions.append("ia.title LIKE ?")
+        params = (*params, f"%{title}%")
+    if summary:
+        conditions.append("ia.summary LIKE ?")
+        params = (*params, f"%{summary}%")
+
+    where_clause = " AND ".join(conditions)
+
+    from script.db.db_selector import ensure_db
+    from script.db import query_news_ai_admin
+    ensure_db("ai")  # 切换到 ai_news.db 并预热连接池
+    items, total = query_news_ai_admin(where_clause, params, page, limit)
+
+    return {"list": items, "total": total, "page": page, "limit": limit}
+
+
 @router.get("/news")
 def get_news(request: Request):
     """获取最新批次的高分新闻"""

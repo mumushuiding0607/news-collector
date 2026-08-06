@@ -6,10 +6,21 @@ importance_ai.py - AI 新闻评分表 CRUD
 """
 
 from .connection import get_conn, put_conn
+from script.log import log as _log
 
-def insert_ai(row: dict, commit: bool = True) -> int | None:
-    """写入 importance_ai 表。返回新记录 id，失败返回 None。"""
-    conn = get_conn()
+
+def insert_ai(row: dict, conn=None, commit=True) -> bool:
+    """
+    写入 importance_ai 表。
+
+    - conn=None 时自己获取连接（兼容其他调用方）
+    - commit=True 时自动 commit
+    - 返回 bool（成功/失败），不再静默抛异常
+    """
+    local_conn = False
+    if conn is None:
+        conn = get_conn()
+        local_conn = True
     try:
         cur = conn.execute("""
             INSERT OR IGNORE INTO importance_ai
@@ -32,11 +43,15 @@ def insert_ai(row: dict, commit: bool = True) -> int | None:
         ))
         if commit:
             conn.commit()
-        return cur.lastrowid
-    except Exception:
-        return None
+        return cur.rowcount > 0
+    except Exception as e:
+        _log("importance_ai", f"insert_ai failed: news_id={row.get('news_id')}, e={e}")
+        if commit:
+            conn.rollback()
+        return False
     finally:
-        put_conn(conn)
+        if local_conn:
+            put_conn(conn)
 
 
 def get_recent_ai(limit: int = 50) -> list[dict]:
@@ -78,12 +93,6 @@ def get_history_ai(limit: int = 100) -> list[dict]:
         put_conn(conn)
 
 
-def _row_to_ai_with_content(row, cols) -> dict:
-    """将 importance_ai 行转为 dict，并附加 primary_sources.content"""
-    d = dict(zip(cols, row))
-    return d
-
-
 def get_latest_ai_with_content(limit: int = 50) -> list[dict]:
     """查询评分最高的 N 条 AI 新闻（含正文内容）。"""
     conn = get_conn()
@@ -114,5 +123,36 @@ def get_history_ai_with_content(limit: int = 100) -> list[dict]:
         """, (limit,)).fetchall()
         cols = [d[0] for d in conn.execute("SELECT * FROM importance_ai LIMIT 0").description] + ["content"]
         return [dict(zip(cols, r)) for r in rows]
+    finally:
+        put_conn(conn)
+
+
+def query_news_ai_admin(
+    where_clause: str, params: tuple, page: int, limit: int
+) -> tuple[list[dict], int]:
+    """
+    AI 新闻管理分页查询（直接查 importance_ai 表）。
+
+    Returns:
+        (items: list[dict], total: int)
+    """
+    conn = get_conn()
+    try:
+        count_sql = f"SELECT COUNT(*) FROM importance_ai ia WHERE {where_clause}"
+        total = conn.execute(count_sql, params).fetchone()[0]
+
+        offset = (page - 1) * limit
+        data_sql = f"""
+            SELECT ia.*
+            FROM importance_ai ia
+            WHERE {where_clause}
+            ORDER BY ia.id DESC
+            LIMIT ? OFFSET ?
+        """
+        cur = conn.execute(data_sql, (*params, limit, offset))
+        rows = cur.fetchall()
+        cols = [d[0] for d in cur.description]
+        items = [dict(zip(cols, r)) for r in rows]
+        return items, total
     finally:
         put_conn(conn)

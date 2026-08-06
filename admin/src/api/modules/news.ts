@@ -22,6 +22,9 @@ export const getAiHistoryNews = () =>
 export const getAiAllNews = () =>
   api.get("/api/news/ai/all");
 
+export const getAiNewsList = (params: Record<string, unknown>) =>
+  api.get("/api/news/ai/list", { params });
+
 export const getNewsDetail = (newsId: number) =>
   api.get(`/api/news/detail/${newsId}`);
 
