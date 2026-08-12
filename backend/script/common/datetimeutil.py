@@ -91,6 +91,22 @@ COMBINED_DATE_REGEX = re.compile(
 def _normalize_to_iso(date_str: str) -> str | None:
     """将任意格式日期字符串规范化为 YYYY-MM-DD HH:MM:SS"""
     s = date_str.strip()
+    # 今天 HH:MM 或 今天 HH:MM:SS
+    m = re.match(r'今天\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$', s)
+    if m:
+        h, mi, sec = m.group(1), m.group(2), m.group(3) or '00'
+        today = date.today().strftime('%Y-%m-%d')
+        try:
+            return f"{today} {int(h):02d}:{int(mi):02d}:{int(sec):02d}"
+        except ValueError:
+            pass
+    # N分钟前（如 "46分钟前"）→ 当天当前时间往前推
+    m = re.match(r'(\d+)分钟前$', s)
+    if m:
+        from datetime import timedelta
+        mins = int(m.group(1))
+        past = datetime.now() - timedelta(minutes=mins)
+        return past.strftime('%Y-%m-%d %H:%M:%S')
     if re.match(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}', s):
         return s
     if re.match(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}', s):

@@ -447,6 +447,7 @@ def list_sources_with_configs(owner_id: int | None = None, include_inactive: boo
                 "list_config": c.get("list_config"),
                 "crawl_order": c.get("crawl_order") or 100,
                 "checked": c.get("checked", 0),
+                "is_flash": c.get("is_flash", 0),
             }
             result.append(entry)
         return result
