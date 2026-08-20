@@ -91,45 +91,45 @@ for /f "delims=" %%i in ('powershell -Command "Get-Date -Format 'yyyy-MM-dd'"') 
 REM ================================================================
 REM Step 0: Upload git-changed files under backend/
 REM ================================================================
-echo.
-echo ================================================================
-echo   Step 0: Upload Changed Files
-echo ================================================================
+@REM echo.
+@REM echo ================================================================
+@REM echo   Step 0: Upload Changed Files
+@REM echo ================================================================
 
-git -C "!PROJECT_ROOT!" diff --name-only -- backend/ > "%TEMP%\git_changes.txt"
-git -C "!PROJECT_ROOT!" ls-files --others --exclude-standard -- backend/ >> "%TEMP%\git_changes.txt"
+@REM git -C "!PROJECT_ROOT!" diff --name-only -- backend/ 2^>nul > "%TEMP%\git_changes.txt"
+@REM git -C "!PROJECT_ROOT!" ls-files --others --exclude-standard -- backend/ 2^>nul >> "%TEMP%\git_changes.txt"
 
-for /f %%A in ('type "%TEMP%\git_changes.txt" ^| find /c /v ""') do set "COUNT=%%A"
+@REM for /f %%A in ('type "%TEMP%\git_changes.txt" ^| %SystemRoot%\System32\find.exe /c /v ""') do set "COUNT=%%A"
 
-if "!COUNT!"=="0" (
-    echo [INFO] No changes in backend/
-    del "%TEMP%\git_changes.txt" 2>nul
-) else (
-    echo [INFO] Found !COUNT! changed file(s):
-    type "%TEMP%\git_changes.txt"
-    echo.
-    goto :upload_retry
-)
-goto :after_upload
+@REM if "!COUNT!"=="0" (
+@REM     echo [INFO] No changes in backend/
+@REM     del "%TEMP%\git_changes.txt" 2>nul
+@REM ) else (
+@REM     echo [INFO] Found !COUNT! changed file(s):
+@REM     type "%TEMP%\git_changes.txt"
+@REM     echo.
+@REM     goto :upload_retry
+@REM )
+@REM goto :after_upload
 
-:upload_retry
-set "UPLOAD_FAIL=0"
-for /f "delims=" %%F in ('type "%TEMP%\git_changes.txt"') do (
-    set "relpath=%%F"
-    set "relpath=!relpath:\=/!"
-    echo   !relpath! --^> !REMOTE_PATH!/!relpath!
-    scp -i "!SSH_KEY_ABS!" -P !SERVER_PORT! "!PROJECT_ROOT!\%%F" "!SERVER_USER!@!SERVER_IP!:/!REMOTE_PATH!/!relpath!"
-    if errorlevel 1 set "UPLOAD_FAIL=1"
-)
-if "!UPLOAD_FAIL!"=="1" (
-    echo [%TIME%] Upload failed, retrying in 2 minutes...
-    timeout /t 120 /nobreak >nul
-    goto :upload_retry
-)
-echo [OK] Uploaded !COUNT! file(s)
-del "%TEMP%\git_changes.txt" 2>nul
+@REM :upload_retry
+@REM set "UPLOAD_FAIL=0"
+@REM for /f "delims=" %%F in ('type "%TEMP%\git_changes.txt"') do (
+@REM     set "relpath=%%F"
+@REM     set "relpath=!relpath:\=/!"
+@REM     echo   !relpath! --^> !REMOTE_PATH!/!relpath!
+@REM     scp -i "!SSH_KEY_ABS!" -P !SERVER_PORT! "!PROJECT_ROOT!\%%F" "!SERVER_USER!@!SERVER_IP!:/!REMOTE_PATH!/!relpath!"
+@REM     if errorlevel 1 set "UPLOAD_FAIL=1"
+@REM )
+@REM if "!UPLOAD_FAIL!"=="1" (
+@REM     echo [%TIME%] Upload failed, retrying in 2 minutes...
+@REM     timeout /t 120 /nobreak >nul
+@REM     goto :upload_retry
+@REM )
+@REM echo [OK] Uploaded !COUNT! file(s)
+@REM del "%TEMP%\git_changes.txt" 2>nul
 
-:after_upload
+@REM :after_upload
 
 REM ================================================================
 REM Step 1: Stop old main.py
